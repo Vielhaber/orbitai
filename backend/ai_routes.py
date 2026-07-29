@@ -109,6 +109,43 @@ async def generate(body: GenerateBody, ctx: AuthContext = Depends(get_auth_conte
         raise HTTPException(status_code=502, detail="Anfrage an die KI ist fehlgeschlagen.")
 
 
+class GenerateImageBody(BaseModel):
+    prompt: str
+
+
+@router.post("/generate-image")
+async def generate_image(body: GenerateImageBody, ctx: AuthContext = Depends(get_auth_context)):
+    prompt = body.prompt.strip()
+    if not prompt:
+        raise HTTPException(status_code=400, detail="Fehlender Prompt.")
+
+    api_key = _get_tenant_key(ctx.tenant_id)
+    if not api_key:
+        raise HTTPException(
+            status_code=400,
+            detail="Kein Gemini API-Key hinterlegt. Bitte zuerst in den Einstellungen speichern.",
+        )
+
+    try:
+        image_b64 = gemini.call_generate_image(api_key, prompt)
+        return {"imageBase64": image_b64}
+    except urllib.error.HTTPError as e:
+        try:
+            import json
+
+            message = json.loads(e.read().decode("utf-8")).get("error", {}).get("message", f"HTTP-Fehler {e.code}")
+        except Exception:
+            message = f"HTTP-Fehler {e.code}"
+        print(f"[generate-image] Gemini HTTP error for tenant {ctx.tenant_id}: {message}")
+        raise HTTPException(status_code=502, detail=message)
+    except Exception as e:
+        print(f"[generate-image] failed for tenant {ctx.tenant_id}: {e}")
+        raise HTTPException(
+            status_code=502,
+            detail=f"Bildgenerierung fehlgeschlagen ({e}). Hinweis: Bild-Generierung ist nicht für jeden Gemini API-Key freigeschaltet.",
+        )
+
+
 @router.get("/scrape")
 async def scrape(url: str = Query(...), ctx: AuthContext = Depends(get_auth_context)):
     safe, reason, pinned_ip = ssrf.is_safe_public_url(url)

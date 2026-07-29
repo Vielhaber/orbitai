@@ -56,6 +56,35 @@ def call_generate(api_key: str, prompt: str, model_name: str) -> str:
     return text
 
 
+def call_generate_image(api_key: str, prompt: str) -> str:
+    """Generates a single image via Gemini's image-capable model and returns
+    it as a base64-encoded PNG string (no data: prefix). Used by the
+    Social-Media-Content tool. This model has narrower availability than the
+    plain text models, so callers should be ready to show the user a clear
+    error if it's not enabled for their API key rather than silently
+    pretending it worked."""
+    model_name = "gemini-2.0-flash-preview-image-generation"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
+    body = json.dumps(
+        {
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {"responseModalities": ["TEXT", "IMAGE"]},
+        }
+    ).encode("utf-8")
+    req = urllib.request.Request(
+        url, data=body, headers={"Content-Type": "application/json"}, method="POST"
+    )
+    with urllib.request.urlopen(req, timeout=60) as resp:
+        data = json.loads(resp.read().decode("utf-8"))
+
+    parts = data.get("candidates", [{}])[0].get("content", {}).get("parts", [])
+    for part in parts:
+        inline = part.get("inlineData") or part.get("inline_data")
+        if inline and inline.get("data"):
+            return inline["data"]
+    raise ValueError("Die KI hat kein Bild zurückgegeben (nur Text oder leere Antwort).")
+
+
 def call_list_models(api_key: str):
     url = f"https://generativelanguage.googleapis.com/v1/models?key={api_key}"
     with urllib.request.urlopen(url, timeout=20) as resp:
