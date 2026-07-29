@@ -625,24 +625,37 @@ select.form-input option {
    ========================================================================== */
 .app-header {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
+  gap: 1rem 1.5rem;
   padding-bottom: 1.5rem;
   border-bottom: 1px solid var(--border-color);
 }
 
+.header-title {
+  flex: 1 1 300px;
+  min-width: 260px;
+}
+
 .header-title h2 {
-  font-size: 1.75rem;
+  font-size: 1.5rem;
   margin-bottom: 0.25rem;
+  white-space: normal;
 }
 
 .header-title p {
   color: var(--text-muted);
+  font-size: 0.85rem;
+  max-width: 480px;
 }
 
 .header-actions {
   display: flex;
-  gap: 1rem;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  flex: 0 1 auto;
+  justify-content: flex-end;
 }
 
 /* ==========================================================================
