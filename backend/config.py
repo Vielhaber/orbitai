@@ -29,6 +29,11 @@ ALLOWED_ORIGINS = [
     if origin.strip()
 ]
 
+# Optional: e-mail address of the operator/founder account. Gates the
+# /api/admin/* routes (usage dashboard, data export). Leave unset in Render's
+# env vars to disable admin routes entirely (they 403 for everyone).
+ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "").strip() or None
+
 DEFAULT_MODEL = "gemini-2.5-flash"
 FALLBACK_MODEL = "gemini-1.5-flash"
 

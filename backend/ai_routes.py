@@ -10,7 +10,7 @@ import urllib.error
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
-import db, gemini, ssrf
+import db, gemini, ssrf, usage
 from auth import AuthContext, get_auth_context
 
 router = APIRouter(prefix="/api")
@@ -92,6 +92,8 @@ async def generate(body: GenerateBody, ctx: AuthContext = Depends(get_auth_conte
             detail="Kein Gemini API-Key hinterlegt. Bitte zuerst in den Einstellungen speichern.",
         )
 
+    usage.check_and_log_usage(ctx.tenant_id, "generate")
+
     try:
         text = gemini.call_generate(api_key, prompt, body.model or "")
         return {"text": text}
@@ -126,6 +128,8 @@ async def generate_image(body: GenerateImageBody, ctx: AuthContext = Depends(get
             detail="Kein Gemini API-Key hinterlegt. Bitte zuerst in den Einstellungen speichern.",
         )
 
+    usage.check_and_log_usage(ctx.tenant_id, "generate-image")
+
     try:
         image_b64 = gemini.call_generate_image(api_key, prompt)
         return {"imageBase64": image_b64}
@@ -151,6 +155,8 @@ async def scrape(url: str = Query(...), ctx: AuthContext = Depends(get_auth_cont
     safe, reason, pinned_ip = ssrf.is_safe_public_url(url)
     if not safe:
         raise HTTPException(status_code=400, detail=reason)
+
+    usage.check_and_log_usage(ctx.tenant_id, "scrape")
 
     import re
     from html.parser import HTMLParser

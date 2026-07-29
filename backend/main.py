@@ -4,6 +4,8 @@ from fastapi.responses import JSONResponse
 
 import config
 from ai_routes import router as ai_router
+from admin_routes import router as admin_router
+from team_routes import router as team_router
 
 app = FastAPI(title="OrbitAI Sales Strategist API")
 
@@ -29,6 +31,8 @@ async def limit_body_size(request: Request, call_next):
 
 
 app.include_router(ai_router)
+app.include_router(admin_router)
+app.include_router(team_router)
 
 
 @app.get("/health")

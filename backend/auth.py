@@ -16,7 +16,7 @@ import logging
 from dataclasses import dataclass
 
 import httpx
-from fastapi import Header, HTTPException
+from fastapi import Depends, Header, HTTPException
 
 import config
 import db
@@ -28,6 +28,7 @@ logger = logging.getLogger("uvicorn.error")
 class AuthContext:
     user_id: str
     tenant_id: str
+    email: str | None = None
 
 
 async def _verify_token(token: str) -> dict:
@@ -76,4 +77,14 @@ async def get_auth_context(authorization: str | None = Header(default=None)) -> 
         # for every new user - but fail closed rather than guessing.
         raise HTTPException(status_code=403, detail="Kein Mandant für diesen Nutzer gefunden.")
 
-    return AuthContext(user_id=user_id, tenant_id=rows[0]["tenant_id"])
+    return AuthContext(user_id=user_id, tenant_id=rows[0]["tenant_id"], email=user.get("email"))
+
+
+async def require_admin(ctx: AuthContext = Depends(get_auth_context)) -> AuthContext:
+    """Gate for operator-only routes (usage dashboard, data export). Compares
+    the verified email from Supabase against ADMIN_EMAIL - simplest possible
+    check that doesn't need a new 'is_admin' column or role system for what
+    is, for now, a single-operator business."""
+    if not config.ADMIN_EMAIL or (ctx.email or "").lower() != config.ADMIN_EMAIL.lower():
+        raise HTTPException(status_code=403, detail="Kein Zugriff.")
+    return ctx
