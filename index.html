@@ -76,7 +76,7 @@
        entirely by bootstrap.js - app.js's init() never runs until this is
        dismissed via a successful sign-in or sign-up. -->
   <div id="login-gate" style="display: none;">
-    <div class="login-card">
+    <div class="login-card" id="main-login-card">
       <div class="brand-title" style="justify-content: center; margin-bottom: 1.5rem;">
         <i data-lucide="orbit" style="width: 28px; height: 28px; color: var(--accent-cyan);"></i>
         <h1 style="font-size: 1.3rem; color: #fff; margin: 0;">OrbitAI <span style="color: var(--accent-cyan);">Sales</span></h1>
@@ -88,9 +88,14 @@
         <label style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 0.35rem;">E-Mail</label>
         <input type="email" id="login-email" class="form-input" placeholder="du@firma.de" autocomplete="username">
       </div>
-      <div class="form-group" style="margin-bottom: 1rem;">
+      <div class="form-group" style="margin-bottom: 0.35rem;">
         <label style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 0.35rem;">Passwort</label>
         <input type="password" id="login-password" class="form-input" placeholder="Mindestens 8 Zeichen" autocomplete="current-password">
+      </div>
+      <div style="text-align: right; margin-bottom: 0.75rem;">
+        <button type="button" id="btn-forgot-password" style="background: none; border: none; color: var(--text-muted); font-size: 0.78rem; cursor: pointer; padding: 0; text-decoration: underline;">
+          Passwort vergessen?
+        </button>
       </div>
       <div id="login-error" class="login-message login-message-error" style="display: none;"></div>
       <div id="login-info" class="login-message login-message-info" style="display: none;"></div>
@@ -105,6 +110,55 @@
       <div id="login-spinner" style="display: none; text-align: center; margin-top: 1rem; color: var(--text-muted); font-size: 0.8rem;">
         Wird bearbeitet...
       </div>
+    </div>
+
+    <!-- Passwort-Reset anfordern: eigene kleine Karte, per JS ein-/ausgeblendet -->
+    <div class="login-card" id="forgot-password-card" style="display: none;">
+      <h2 style="font-size: 1.1rem; color: #fff; margin: 0 0 0.5rem 0;">Passwort zurücksetzen</h2>
+      <p style="color: var(--text-muted); font-size: 0.85rem; margin: 0 0 1.25rem 0;">
+        Gib deine E-Mail-Adresse ein - wir schicken dir einen Link zum Zurücksetzen.
+      </p>
+      <div class="form-group" style="margin-bottom: 1rem;">
+        <label style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 0.35rem;">E-Mail</label>
+        <input type="email" id="forgot-password-email" class="form-input" placeholder="du@firma.de" autocomplete="username">
+      </div>
+      <div id="forgot-password-error" class="login-message login-message-error" style="display: none;"></div>
+      <div id="forgot-password-info" class="login-message login-message-info" style="display: none;"></div>
+      <div style="display: flex; gap: 0.75rem; margin-top: 1.25rem;">
+        <button type="button" id="btn-send-reset" class="btn btn-primary" style="flex: 1; background: var(--accent-cyan); color: #000; border-color: var(--accent-cyan);">
+          Link senden
+        </button>
+        <button type="button" id="btn-cancel-forgot-password" class="btn btn-outline" style="flex: 1;">
+          Zurück
+        </button>
+      </div>
+    </div>
+
+    <!-- Neues Passwort setzen: erscheint automatisch, wenn Supabase nach Klick
+         auf den Reset-Link eine PASSWORD_RECOVERY-Session liefert. -->
+    <div class="login-card" id="recovery-card" style="display: none;">
+      <h2 style="font-size: 1.1rem; color: #fff; margin: 0 0 0.5rem 0;">Neues Passwort setzen</h2>
+      <p style="color: var(--text-muted); font-size: 0.85rem; margin: 0 0 1.25rem 0;">
+        Vergib ein neues Passwort für dein Konto.
+      </p>
+      <div class="form-group" style="margin-bottom: 1rem;">
+        <label style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 0.35rem;">Neues Passwort</label>
+        <input type="password" id="recovery-password" class="form-input" placeholder="Mindestens 8 Zeichen" autocomplete="new-password">
+      </div>
+      <div id="recovery-error" class="login-message login-message-error" style="display: none;"></div>
+      <div style="display: flex; gap: 0.75rem; margin-top: 1.25rem;">
+        <button type="button" id="btn-set-new-password" class="btn btn-primary" style="flex: 1; background: var(--accent-cyan); color: #000; border-color: var(--accent-cyan);">
+          Passwort speichern
+        </button>
+      </div>
+    </div>
+
+    <div style="text-align: center; margin-top: 1.5rem; font-size: 0.75rem; color: var(--text-dim);">
+      <a href="impressum.html" style="color: var(--text-dim);">Impressum</a>
+      &nbsp;·&nbsp;
+      <a href="datenschutz.html" style="color: var(--text-dim);">Datenschutz</a>
+      &nbsp;·&nbsp;
+      <a href="agb.html" style="color: var(--text-dim);">AGB</a>
     </div>
   </div>
 
@@ -146,7 +200,7 @@
         <div class="form-group" style="margin-top: 0.5rem; margin-bottom: 0;">
           <div class="input-wrapper">
             <i data-lucide="brain"></i>
-            <select id="select-model" class="form-input" style="padding-left: 2.75rem; background: rgba(10, 14, 23, 0.8); color: var(--text-main); cursor: pointer;">
+            <select id="select-model" class="form-input" style="padding-left: 2.75rem; background: rgba(10, 14, 23, 0.8); color: var(--text-main); cursor: pointer; font-size: 0.8rem;" title="Gemini-Modell auswählen">
               <option value="gemini-2.5-flash" selected>Gemini 3.6 Flash (Empfohlen)</option>
               <option value="gemini-1.5-flash">Gemini 1.5 Flash (Am stabilsten)</option>
               <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
@@ -221,6 +275,9 @@
           </button>
           <button class="btn-glass-tools" id="btn-header-ai-tools" title="KI-Werkzeuge öffnen">
             KI-Werkzeuge
+          </button>
+          <button class="btn btn-outline" id="btn-header-admin" title="Admin-Dashboard öffnen" style="display: none; gap: 0.5rem; align-items: center;">
+            <i data-lucide="shield" style="width: 14px; height: 14px;"></i> Admin
           </button>
           <button class="btn btn-primary" id="btn-save-campaign" title="Aktuelle Kampagne & Leads speichern" style="gap: 0.5rem; width: auto; display: none;">
             <i data-lucide="bookmark"></i> Kampagne speichern
@@ -476,13 +533,44 @@
               </div>
             </div>
 
-            <div style="display: flex; justify-content: flex-end; gap: 1rem; margin-top: 1rem; border-top: 1px solid var(--border-color); padding-top: 1.5rem;">
-              <button class="btn btn-outline" id="btn-reset-settings" style="width: auto; gap: 0.25rem;">
-                <i data-lucide="refresh-cw"></i> Werkseinstellungen
+            <!-- Team: weitere bereits registrierte Nutzer zum eigenen Tenant hinzufügen. -->
+            <div style="border-top: 1px solid var(--border-color); padding-top: 1.5rem; margin-top: 1.5rem;">
+              <h4 style="font-size: 1.1rem; color: var(--accent-cyan); margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.5rem;">
+                <i data-lucide="users"></i> Team
+              </h4>
+              <p style="color: var(--text-muted); font-size: 0.85rem; margin: 0 0 1rem 0;">
+                Füge Kolleg:innen zu deinem Konto hinzu, damit sie dieselben Kampagnen und Leads sehen. Die Person muss sich vorher selbst mit ihrer E-Mail registriert haben.
+              </p>
+              <div style="display: flex; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 0.75rem;">
+                <input type="email" id="team-invite-email" class="form-input" placeholder="kollege@firma.de" style="flex: 1; min-width: 220px;">
+                <button class="btn btn-outline" id="btn-team-invite" style="width: auto; gap: 0.5rem;">
+                  <i data-lucide="user-plus"></i> Hinzufügen
+                </button>
+              </div>
+              <div id="team-invite-message" class="login-message" style="display: none; margin-bottom: 0.75rem;"></div>
+              <div id="team-members-list" style="display: flex; flex-direction: column; gap: 0.4rem;"></div>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-top: 1.5rem; border-top: 1px solid var(--border-color); padding-top: 1.5rem; flex-wrap: wrap;">
+              <button class="btn btn-outline" id="btn-restart-tour" style="width: auto; gap: 0.25rem;">
+                <i data-lucide="compass"></i> Einführungstour erneut starten
               </button>
-              <button class="btn btn-primary" id="btn-save-settings" style="width: auto; gap: 0.5rem; background: var(--accent-cyan); color: #000; border-color: var(--accent-cyan);">
-                <i data-lucide="save"></i> Setup speichern
-              </button>
+              <div style="display: flex; gap: 1rem;">
+                <button class="btn btn-outline" id="btn-reset-settings" style="width: auto; gap: 0.25rem;">
+                  <i data-lucide="refresh-cw"></i> Werkseinstellungen
+                </button>
+                <button class="btn btn-primary" id="btn-save-settings" style="width: auto; gap: 0.5rem; background: var(--accent-cyan); color: #000; border-color: var(--accent-cyan);">
+                  <i data-lucide="save"></i> Setup speichern
+                </button>
+              </div>
+            </div>
+
+            <div style="text-align: center; margin-top: 1rem; font-size: 0.75rem; color: var(--text-dim);">
+              <a href="impressum.html" target="_blank" style="color: var(--text-dim);">Impressum</a>
+              &nbsp;·&nbsp;
+              <a href="datenschutz.html" target="_blank" style="color: var(--text-dim);">Datenschutz</a>
+              &nbsp;·&nbsp;
+              <a href="agb.html" target="_blank" style="color: var(--text-dim);">AGB</a>
             </div>
           </div>
           
@@ -1232,6 +1320,46 @@
         </div>
 
       </div>
+    </div>
+  </section>
+
+  <!-- ADMIN DASHBOARD VIEW (nur für den Betreiber-Account sichtbar/erreichbar) -->
+  <section class="glass-card" id="admin-card" style="display: none; flex-direction: column; gap: 1.5rem; padding: 2rem; margin: 2rem;">
+    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 1rem;">
+      <div>
+        <h2 style="font-size: 1.5rem; color: var(--text-main); display: flex; align-items: center; gap: 0.5rem; margin: 0 0 0.25rem 0;">
+          <i data-lucide="shield" style="width: 24px; height: 24px;"></i> Admin-Dashboard
+        </h2>
+        <p style="color: var(--text-muted); font-size: 0.9rem; margin: 0;">
+          Nutzung über alle Kunden hinweg, plus Daten-Export als Backup.
+        </p>
+      </div>
+      <div style="display: flex; gap: 0.75rem;">
+        <button class="btn btn-outline" id="btn-admin-export" style="width: auto; gap: 0.5rem;">
+          <i data-lucide="download"></i> Backup exportieren (JSON)
+        </button>
+        <button class="btn btn-outline" id="btn-back-from-admin" style="width: auto; gap: 0.25rem;">
+          <i data-lucide="arrow-left"></i> Zurück
+        </button>
+      </div>
+    </div>
+
+    <div id="admin-summary" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem;"></div>
+
+    <div style="overflow-x: auto;">
+      <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
+        <thead>
+          <tr style="text-align: left; color: var(--text-muted); border-bottom: 1px solid var(--border-color);">
+            <th style="padding: 0.5rem;">Kunde</th>
+            <th style="padding: 0.5rem;">Plan</th>
+            <th style="padding: 0.5rem;">Limit/Tag</th>
+            <th style="padding: 0.5rem;">Nutzung 24h</th>
+            <th style="padding: 0.5rem;">Nutzung 7 Tage</th>
+            <th style="padding: 0.5rem;">Erstellt am</th>
+          </tr>
+        </thead>
+        <tbody id="admin-tenants-table"></tbody>
+      </table>
     </div>
   </section>
 

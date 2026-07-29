@@ -22,6 +22,10 @@ import {
   apiGenerate,
   apiGenerateImage,
   apiScrape,
+  apiAdminStats,
+  apiAdminExport,
+  apiInviteMember,
+  apiListTeam,
   parseGeminiResponse,
   buildStrategistPrompt,
   buildLeadFinderPrompt,
@@ -39,6 +43,8 @@ import {
 } from "./api.js";
 
 import { syncToCloud, syncSettingsToCloud } from "./cloud.js";
+import { getCurrentUserEmail } from "./auth.js";
+import { ADMIN_EMAIL } from "./config.js";
 
 const PREPACKAGED_DEMOS = window.PREPACKAGED_DEMOS || {};
 
@@ -173,6 +179,21 @@ function init() {
   const aiToolsCard = document.getElementById("ai-tools-card");
   const btnBackFromAiTools = document.getElementById("btn-back-from-ai-tools");
 
+  // Admin-Dashboard DOM Elements
+  const btnHeaderAdmin = document.getElementById("btn-header-admin");
+  const adminCard = document.getElementById("admin-card");
+  const btnBackFromAdmin = document.getElementById("btn-back-from-admin");
+  const btnAdminExport = document.getElementById("btn-admin-export");
+  const adminSummary = document.getElementById("admin-summary");
+  const adminTenantsTable = document.getElementById("admin-tenants-table");
+
+  // Team DOM Elements
+  const teamInviteEmail = document.getElementById("team-invite-email");
+  const btnTeamInvite = document.getElementById("btn-team-invite");
+  const teamInviteMessage = document.getElementById("team-invite-message");
+  const teamMembersList = document.getElementById("team-members-list");
+  const btnRestartTour = document.getElementById("btn-restart-tour");
+
   // Global State
   let currentEmails = [];
   let currentCampaignKey = null;
@@ -254,6 +275,13 @@ function init() {
     lucide.createIcons();
   }
 
+  if (modelSelect) {
+    modelSelect.addEventListener("change", () => {
+      const selected = modelSelect.options[modelSelect.selectedIndex];
+      modelSelect.title = selected ? selected.text : "";
+    });
+  }
+
   async function refreshModelOptions() {
     try {
       const models = await apiListModels();
@@ -272,6 +300,7 @@ function init() {
         else if (m.name.includes("flash")) displayName += " (Flash)";
 
         option.text = displayName;
+        option.title = displayName;
         modelSelect.appendChild(option);
       });
 
@@ -288,6 +317,8 @@ function init() {
       if (!defaultSelected && modelSelect.options.length > 0) {
         modelSelect.options[0].selected = true;
       }
+      const selectedOpt = modelSelect.options[modelSelect.selectedIndex];
+      if (selectedOpt) modelSelect.title = selectedOpt.text;
     } catch (err) {
       console.error("Failed to load models dynamically:", err);
     }
@@ -2754,6 +2785,350 @@ function init() {
         if (socialImageLoading) socialImageLoading.style.display = "none";
         btnGenerateSocialImage.disabled = false;
       }
+    });
+  }
+
+  // --- ADMIN-DASHBOARD ---
+  // Button bleibt für alle anderen Nutzer versteckt (display:none per HTML) -
+  // echte Absicherung passiert serverseitig in auth.require_admin, das ist
+  // hier nur Komfort, damit niemand sonst überhaupt einen Button sieht, der
+  // ohnehin nur 403 zurückgeben würde.
+  (async () => {
+    try {
+      const email = await getCurrentUserEmail();
+      if (btnHeaderAdmin && email && ADMIN_EMAIL && email.toLowerCase() === ADMIN_EMAIL.toLowerCase()) {
+        btnHeaderAdmin.style.display = "flex";
+      }
+    } catch (err) {
+      console.error("Admin-Check fehlgeschlagen:", err);
+    }
+  })();
+
+  function renderAdminSummary(stats) {
+    if (!adminSummary) return;
+    const cards = [
+      { label: "Kunden gesamt", value: stats.total_tenants },
+      { label: "Nutzer gesamt", value: stats.total_members },
+      { label: "KI-Aufrufe (24h)", value: stats.total_usage_24h },
+      { label: "KI-Aufrufe (7 Tage)", value: stats.total_usage_7d },
+    ];
+    adminSummary.innerHTML = cards
+      .map(
+        (c) => `
+      <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 8px; padding: 1rem; text-align: center;">
+        <div style="font-size: 1.6rem; font-weight: 700; color: var(--text-main);">${c.value}</div>
+        <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;">${escapeHtml(c.label)}</div>
+      </div>
+    `
+      )
+      .join("");
+  }
+
+  function renderAdminTenantsTable(tenants) {
+    if (!adminTenantsTable) return;
+    if (!tenants.length) {
+      adminTenantsTable.innerHTML = `<tr><td colspan="6" style="padding: 1rem; color: var(--text-dim); text-align: center;">Noch keine Kunden.</td></tr>`;
+      return;
+    }
+    adminTenantsTable.innerHTML = tenants
+      .map(
+        (t) => `
+      <tr style="border-bottom: 1px solid var(--border-color);">
+        <td style="padding: 0.5rem;">${escapeHtml(t.name || "")}</td>
+        <td style="padding: 0.5rem;">${escapeHtml(t.plan || "")}</td>
+        <td style="padding: 0.5rem;">${t.daily_ai_limit}</td>
+        <td style="padding: 0.5rem;">${t.usage_24h}</td>
+        <td style="padding: 0.5rem;">${t.usage_7d}</td>
+        <td style="padding: 0.5rem; color: var(--text-muted);">${new Date(t.created_at).toLocaleDateString("de-DE")}</td>
+      </tr>
+    `
+      )
+      .join("");
+  }
+
+  if (btnHeaderAdmin) {
+    btnHeaderAdmin.addEventListener("click", async () => {
+      if (welcomeCard) welcomeCard.style.display = "none";
+      if (reportContainer) reportContainer.style.display = "none";
+      if (leadFinderCardMain) leadFinderCardMain.style.display = "none";
+      if (settingsCard) settingsCard.style.display = "none";
+      if (errorCard) errorCard.style.display = "none";
+      if (landingpageCard) landingpageCard.style.display = "none";
+      if (aiToolsCard) aiToolsCard.style.display = "none";
+      if (adminCard) adminCard.style.display = "flex";
+
+      if (adminSummary) adminSummary.innerHTML = `<p style="color: var(--text-muted);">Lade...</p>`;
+      try {
+        const stats = await apiAdminStats();
+        renderAdminSummary(stats);
+        renderAdminTenantsTable(stats.tenants);
+      } catch (err) {
+        console.error("Admin-Stats laden fehlgeschlagen:", err);
+        if (adminSummary) {
+          adminSummary.innerHTML = `<p style="color: var(--color-error);">Konnte Statistiken nicht laden: ${escapeHtml(err.message)}</p>`;
+        }
+      }
+    });
+  }
+
+  if (btnBackFromAdmin) {
+    btnBackFromAdmin.addEventListener("click", () => {
+      if (adminCard) adminCard.style.display = "none";
+      if (currentCampaignData) {
+        if (reportContainer) reportContainer.style.display = "flex";
+      } else {
+        if (welcomeCard) welcomeCard.style.display = "flex";
+      }
+    });
+  }
+
+  if (btnAdminExport) {
+    btnAdminExport.addEventListener("click", async () => {
+      btnAdminExport.disabled = true;
+      try {
+        const data = await apiAdminExport();
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = `orbitai-backup-${new Date().toISOString().slice(0, 10)}.json`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } catch (err) {
+        alert("Export fehlgeschlagen: " + err.message);
+      } finally {
+        btnAdminExport.disabled = false;
+      }
+    });
+  }
+
+  // --- TEAM ---
+
+  function renderTeamMembers(members) {
+    if (!teamMembersList) return;
+    if (!members.length) {
+      teamMembersList.innerHTML = `<p style="color: var(--text-dim); font-size: 0.8rem; margin: 0;">Noch keine weiteren Team-Mitglieder.</p>`;
+      return;
+    }
+    teamMembersList.innerHTML = members
+      .map(
+        (m) => `
+      <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0.75rem; background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.85rem;">
+        <span>${escapeHtml(m.email)}</span>
+        <span style="color: var(--text-muted); font-size: 0.75rem; text-transform: uppercase;">${escapeHtml(m.role)}</span>
+      </div>
+    `
+      )
+      .join("");
+  }
+
+  async function loadTeamMembers() {
+    if (!teamMembersList) return;
+    try {
+      const members = await apiListTeam();
+      renderTeamMembers(members);
+    } catch (err) {
+      console.error("Team-Mitglieder laden fehlgeschlagen:", err);
+    }
+  }
+
+  if (btnHeaderSettings) {
+    btnHeaderSettings.addEventListener("click", () => {
+      // Nach dem (evtl. Admin-Passwort-geschützten) Öffnen-Handler prüfen, ob
+      // das Setup wirklich sichtbar wurde, bevor Team-Daten geladen werden.
+      setTimeout(() => {
+        if (settingsCard && settingsCard.style.display === "flex") loadTeamMembers();
+      }, 50);
+    });
+  }
+
+  if (btnTeamInvite) {
+    btnTeamInvite.addEventListener("click", async () => {
+      const email = teamInviteEmail.value.trim();
+      if (teamInviteMessage) teamInviteMessage.style.display = "none";
+      if (!email) return;
+
+      btnTeamInvite.disabled = true;
+      try {
+        const status = await apiInviteMember(email);
+        let message = "";
+        let isError = false;
+        if (status === "added") {
+          message = `${email} wurde zum Team hinzugefügt.`;
+          teamInviteEmail.value = "";
+          loadTeamMembers();
+        } else if (status === "already_member") {
+          message = `${email} ist bereits Teammitglied.`;
+        } else {
+          message = "Diese Person muss sich zuerst selbst mit dieser E-Mail registrieren, dann kannst du sie hinzufügen.";
+          isError = true;
+        }
+        if (teamInviteMessage) {
+          teamInviteMessage.textContent = message;
+          teamInviteMessage.className = "login-message " + (isError ? "login-message-error" : "login-message-info");
+          teamInviteMessage.style.display = "block";
+        }
+      } catch (err) {
+        if (teamInviteMessage) {
+          teamInviteMessage.textContent = err.message;
+          teamInviteMessage.className = "login-message login-message-error";
+          teamInviteMessage.style.display = "block";
+        }
+      } finally {
+        btnTeamInvite.disabled = false;
+      }
+    });
+  }
+
+  // --- ONBOARDING-TOUR ---
+  // Selbstgebaut (kein CDN-Abhängigkeit): dimmt die Seite, hebt nacheinander
+  // ein paar Kernelemente per Glow-Rahmen hervor und zeigt eine Tooltip-Karte
+  // mit Weiter/Überspringen. Läuft automatisch einmal pro Browser (Flag in
+  // localStorage) und kann über "Einführungstour erneut starten" im Setup
+  // erneut gestartet werden.
+  function initOnboardingTour() {
+    try {
+      if (localStorage.getItem("orbitai_onboarding_seen") === "1") return;
+    } catch (e) {
+      return;
+    }
+    setTimeout(() => startOnboardingTour(), 700);
+  }
+
+  function startOnboardingTour() {
+    const steps = [
+      {
+        el: () => document.getElementById("api-key-card"),
+        title: "1. Gemini API-Key hinterlegen",
+        text: "Trag hier deinen Gemini API-Key ein, damit alle KI-Funktionen live arbeiten. Ohne Key läuft die App mit Beispieldaten weiter.",
+      },
+      {
+        el: () => document.querySelector(".config-card"),
+        title: "2. Kampagne generieren",
+        text: "Branche und Produkt eingeben, dann 'Cockpit generieren' klicken - die KI erstellt eine komplette Vertriebsstrategie mit ROI-Rechner und Einwand-Trainer.",
+      },
+      {
+        el: () => btnHeaderLeadFinder,
+        title: "3. KI Lead-Scout",
+        text: "Findet passende B2B-Firmen für dein Produkt in einer bestimmten Region.",
+      },
+      {
+        el: () => btnHeaderLandingpageGen,
+        title: "4. KI Landingpage-Gen",
+        text: "Erstellt eine fertige, responsive Landingpage passend zu deiner Kampagne, direkt als HTML zum Download.",
+      },
+      {
+        el: () => btnHeaderAiTools,
+        title: "5. KI-Werkzeuge",
+        text: "Reklamationen beantworten, Produktlistungen, Social-Media-Kampagnen, Trend-Radar und Social-Media-Content - fünf weitere KI-Assistenten an einem Ort.",
+      },
+      {
+        el: () => btnHeaderSettings,
+        title: "6. Setup",
+        text: "Branding anpassen, Team-Mitglieder einladen und Daten-Backups verwalten.",
+      },
+    ];
+
+    let index = 0;
+    let highlightedEl = null;
+
+    const overlay = document.createElement("div");
+    overlay.id = "onboarding-overlay";
+    overlay.style.cssText = "position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:9998;";
+
+    const tooltip = document.createElement("div");
+    tooltip.id = "onboarding-tooltip";
+    tooltip.style.cssText =
+      "position:fixed; z-index:9999; max-width:320px; background:#0e121e; border:1px solid var(--accent-cyan); border-radius:10px; padding:1.25rem; box-shadow:0 8px 30px rgba(0,0,0,0.6); color:#fff; font-size:0.85rem;";
+
+    document.body.appendChild(overlay);
+    document.body.appendChild(tooltip);
+
+    function clearHighlight() {
+      if (highlightedEl) {
+        highlightedEl.style.position = highlightedEl.dataset.origPosition || "";
+        highlightedEl.style.zIndex = "";
+        highlightedEl.style.boxShadow = "";
+        delete highlightedEl.dataset.origPosition;
+        highlightedEl = null;
+      }
+    }
+
+    function endTour() {
+      clearHighlight();
+      overlay.remove();
+      tooltip.remove();
+      try {
+        localStorage.setItem("orbitai_onboarding_seen", "1");
+      } catch (e) {
+        /* ignore */
+      }
+    }
+
+    function renderStep() {
+      clearHighlight();
+      while (index < steps.length && !steps[index].el()) index++;
+      if (index >= steps.length) {
+        endTour();
+        return;
+      }
+
+      const step = steps[index];
+      const el = step.el();
+      if (typeof el.scrollIntoView === "function") {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+
+      setTimeout(() => {
+        const rect = el.getBoundingClientRect();
+        highlightedEl = el;
+        el.dataset.origPosition = el.style.position;
+        el.style.position = "relative";
+        el.style.zIndex = "9999";
+        el.style.boxShadow = "0 0 0 4px var(--accent-cyan), 0 0 30px rgba(0, 242, 254, 0.5)";
+        if (!el.style.borderRadius) el.style.borderRadius = "8px";
+
+        const isLast = index === steps.length - 1;
+        tooltip.innerHTML = `
+          <div style="font-weight:700; margin-bottom:0.4rem; color: var(--accent-cyan);">${escapeHtml(step.title)}</div>
+          <div style="color:#ccc; line-height:1.4; margin-bottom:1rem;">${escapeHtml(step.text)}</div>
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <button type="button" id="onboarding-skip" style="background:none;border:none;color:#888;font-size:0.75rem;cursor:pointer;">Tour überspringen</button>
+            <button type="button" id="onboarding-next" style="background:var(--accent-cyan);color:#000;border:none;border-radius:6px;padding:0.5rem 1rem;font-weight:600;cursor:pointer;">${isLast ? "Fertig" : "Weiter"}</button>
+          </div>
+        `;
+
+        const top = Math.min(window.innerHeight - 200, Math.max(20, rect.bottom + 12));
+        const left = Math.min(window.innerWidth - 340, Math.max(20, rect.left));
+        tooltip.style.top = top + "px";
+        tooltip.style.left = left + "px";
+
+        const nextBtn = document.getElementById("onboarding-next");
+        const skipBtn = document.getElementById("onboarding-skip");
+        if (nextBtn) {
+          nextBtn.addEventListener("click", () => {
+            index++;
+            renderStep();
+          });
+        }
+        if (skipBtn) skipBtn.addEventListener("click", endTour);
+      }, 350);
+    }
+
+    renderStep();
+  }
+
+  initOnboardingTour();
+
+  if (btnRestartTour) {
+    btnRestartTour.addEventListener("click", () => {
+      if (settingsCard) settingsCard.style.display = "none";
+      if (currentCampaignData) {
+        if (reportContainer) reportContainer.style.display = "flex";
+      } else {
+        if (welcomeCard) welcomeCard.style.display = "flex";
+      }
+      startOnboardingTour();
     });
   }
 }

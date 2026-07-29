@@ -43,6 +43,11 @@ export async function getAccessToken() {
   return session ? session.access_token : null;
 }
 
+export async function getCurrentUserEmail() {
+  const session = await getSession();
+  return session && session.user ? session.user.email : null;
+}
+
 /**
  * Resolves and caches the current user's tenant id. Reads from
  * tenant_members, which only grants a user access to their own membership
@@ -70,5 +75,27 @@ export async function getTenantId() {
 }
 
 export function onAuthStateChange(callback) {
-  supabaseClient.auth.onAuthStateChange((_event, session) => callback(session));
+  // Passes the event too (e.g. "PASSWORD_RECOVERY") as an optional second
+  // argument - existing callers that only take `session` are unaffected.
+  supabaseClient.auth.onAuthStateChange((event, session) => callback(session, event));
+}
+
+/** Sends a password-reset email via Supabase's own built-in mailer (no
+ * separate email service needed). Clicking the link in that email brings
+ * the user back to this same page with a recovery session, which
+ * onAuthStateChange in bootstrap.js detects via the "PASSWORD_RECOVERY"
+ * event. */
+export async function requestPasswordReset(email) {
+  const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
+    redirectTo: window.location.origin + window.location.pathname,
+  });
+  if (error) throw new Error(error.message);
+}
+
+/** Sets a new password for the currently active session. Only meaningful
+ * right after a PASSWORD_RECOVERY event - Supabase's recovery session is a
+ * real (temporary) session, so this uses the normal updateUser call. */
+export async function updatePassword(newPassword) {
+  const { error } = await supabaseClient.auth.updateUser({ password: newPassword });
+  if (error) throw new Error(error.message);
 }

@@ -94,6 +94,44 @@ export async function apiScrape(url) {
   return data.text || "";
 }
 
+/** Operator-only usage dashboard data. 403s server-side for anyone whose
+ * verified e-mail doesn't match the backend's ADMIN_EMAIL env var. */
+export async function apiAdminStats() {
+  const res = await authFetch("/api/admin/stats");
+  const data = await readJsonSafe(res);
+  if (!res.ok) throw new Error(data.detail || data.error || `HTTP-Fehler ${res.status}`);
+  return data;
+}
+
+/** Operator-only full data export (for manual or scheduled backups). */
+export async function apiAdminExport() {
+  const res = await authFetch("/api/admin/export");
+  const data = await readJsonSafe(res);
+  if (!res.ok) throw new Error(data.detail || data.error || `HTTP-Fehler ${res.status}`);
+  return data;
+}
+
+/** Invites an already-registered user (by e-mail) to the current tenant as a
+ * 'member'. Returns 'added' | 'already_member' | 'not_found'. */
+export async function apiInviteMember(email) {
+  const res = await authFetch("/api/team/invite", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+  });
+  const data = await readJsonSafe(res);
+  if (!res.ok) throw new Error(data.detail || data.error || `HTTP-Fehler ${res.status}`);
+  return data.status;
+}
+
+/** Lists the other members of the current tenant. */
+export async function apiListTeam() {
+  const res = await authFetch("/api/team/members");
+  const data = await readJsonSafe(res);
+  if (!res.ok) throw new Error(data.detail || data.error || `HTTP-Fehler ${res.status}`);
+  return data.members || [];
+}
+
 /**
  * Generates a single image via the backend's Gemini image proxy and returns
  * a ready-to-use data: URL. Note: image generation is not enabled for every

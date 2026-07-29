@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<title>Datenschutzerklärung - OrbitAI Sales</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  body { max-width: 780px; margin: 0 auto; padding: 3rem 1.5rem; line-height: 1.6; }
+  h1 { color: var(--accent-cyan); }
+  h2 { font-size: 1.15rem; margin-top: 2rem; color: var(--accent-cyan); }
+  h3 { font-size: 1rem; margin-top: 1.25rem; }
+  .draft-notice { background: rgba(239, 68, 68, 0.08); border: 1px solid var(--color-error); border-radius: 8px; padding: 1rem 1.25rem; margin-bottom: 2rem; font-size: 0.9rem; }
+  .placeholder { color: #f59e0b; }
+  a { color: var(--accent-cyan); }
+  code { background: rgba(255,255,255,0.05); padding: 0.1rem 0.4rem; border-radius: 4px; }
+</style>
+</head>
+<body>
+  <div class="draft-notice">
+    <strong>Hinweis:</strong> Dies ist ein automatisch erstellter Entwurf, keine Rechtsberatung. Bitte von einer Anwältin/einem Anwalt prüfen lassen (insbesondere im Hinblick auf DSGVO/GDPR), bevor die Seite live geht, und alle <span class="placeholder">markierten Platzhalter</span> ausfüllen.
+  </div>
+
+  <h1>Datenschutzerklärung</h1>
+
+  <h2>1. Verantwortlicher</h2>
+  <p>
+    <span class="placeholder">[Vollständiger Name / Firmenname, Anschrift, E-Mail]</span> ist verantwortlich für die Verarbeitung personenbezogener Daten im Rahmen dieser Anwendung ("OrbitAI Sales").
+  </p>
+
+  <h2>2. Welche Daten wir verarbeiten</h2>
+  <h3>2.1 Konto- und Anmeldedaten</h3>
+  <p>Bei der Registrierung verarbeiten wir deine E-Mail-Adresse und ein von dir gewähltes Passwort (verschlüsselt gespeichert). Die Authentifizierung erfolgt über unseren Infrastruktur-Dienstleister Supabase Inc.</p>
+
+  <h3>2.2 Nutzungsdaten / KI-Anfragen</h3>
+  <p>
+    Kampagnen, Kundendaten (Leads) und Einstellungen, die du im Cockpit anlegst, werden in unserer Datenbank (Supabase, Region: <span class="placeholder">[Region prüfen]</span>) gespeichert, ausschließlich sichtbar für dein eigenes Konto.
+    Texte, die du an die KI-Funktionen (z. B. Reklamations-Assistent, Landingpage-Generator) sendest, werden zur Verarbeitung an die Google Gemini API weitergeleitet - siehe Abschnitt 4.
+  </p>
+
+  <h3>2.3 Dein eigener Gemini-API-Key</h3>
+  <p>Falls du einen eigenen Google-Gemini-API-Key hinterlegst, wird dieser verschlüsselt serverseitig gespeichert und ausschließlich verwendet, um KI-Anfragen in deinem Namen an Google zu senden.</p>
+
+  <h3>2.4 Server-/Nutzungs-Logs</h3>
+  <p>Aus technischen und Abrechnungsgründen (Rate-Limiting) protokollieren wir, wann ein Konto welche KI-Funktion genutzt hat (Zeitstempel + Endpunkt, keine Inhalte).</p>
+
+  <h2>3. Zwecke und Rechtsgrundlagen (Art. 6 DSGVO)</h2>
+  <p>
+    Vertragserfüllung (Art. 6 Abs. 1 lit. b DSGVO) für die Bereitstellung des Dienstes; berechtigtes Interesse (Art. 6 Abs. 1 lit. f DSGVO) für Missbrauchsschutz und Nutzungslimits; Einwilligung (Art. 6 Abs. 1 lit. a DSGVO), soweit du optionale Funktionen aktiv nutzt.
+  </p>
+
+  <h2>4. Empfänger und Drittanbieter</h2>
+  <ul>
+    <li><strong>Supabase Inc.</strong> - Datenbank und Authentifizierung.</li>
+    <li><strong>Render Services, Inc.</strong> - Hosting des Backends.</li>
+    <li><strong>GitHub, Inc.</strong> - Hosting der Weboberfläche (GitHub Pages).</li>
+    <li><strong>Google LLC (Gemini API)</strong> - Verarbeitung der von dir eingegebenen Prompts zur KI-Textgenerierung, sofern du KI-Funktionen nutzt.</li>
+  </ul>
+  <p>Mit diesen Anbietern bestehen bzw. sollten Auftragsverarbeitungsverträge (AVV) nach Art. 28 DSGVO bestehen <span class="placeholder">[prüfen und abschließen]</span>. Bei Anbietern außerhalb der EU/des EWR (z. B. Google, teils Supabase/Render je nach Serverstandort) erfolgt die Übermittlung auf Basis von Standardvertragsklauseln <span class="placeholder">[prüfen]</span>.</p>
+
+  <h2>5. Speicherdauer</h2>
+  <p>Wir speichern deine Daten, solange dein Konto besteht. Nach Kündigung/Löschung des Kontos werden die Daten innerhalb von <span class="placeholder">[Frist, z. B. 30 Tage]</span> gelöscht, soweit keine gesetzlichen Aufbewahrungspflichten entgegenstehen.</p>
+
+  <h2>6. Deine Rechte</h2>
+  <p>Du hast das Recht auf Auskunft (Art. 15 DSGVO), Berichtigung (Art. 16), Löschung (Art. 17), Einschränkung der Verarbeitung (Art. 18), Datenübertragbarkeit (Art. 20) und Widerspruch (Art. 21) sowie das Recht auf Beschwerde bei einer Aufsichtsbehörde. Kontaktiere uns dazu unter <span class="placeholder">[E-Mail-Adresse]</span>.</p>
+
+  <h2>7. Cookies / Local Storage</h2>
+  <p>Die Anwendung nutzt technisch notwendigen Local Storage im Browser (z. B. für die Anmelde-Sitzung), keine Tracking- oder Marketing-Cookies.</p>
+
+  <h2>8. Kontakt für Datenschutzfragen</h2>
+  <p><span class="placeholder">[Name/E-Mail einer verantwortlichen Kontaktperson]</span></p>
+
+  <p style="margin-top: 3rem;"><a href="index.html">&larr; Zurück zum Cockpit</a></p>
+</body>
+</html>
