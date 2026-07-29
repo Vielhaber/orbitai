@@ -12,11 +12,15 @@ Every route that touches tenant-scoped data or the Gemini key MUST depend on
 knowing which tenant it's acting on behalf of.
 """
 
+import logging
+import traceback
 from dataclasses import dataclass
 
 from fastapi import Header, HTTPException
 
 import db
+
+logger = logging.getLogger("uvicorn.error")
 
 
 @dataclass
@@ -35,8 +39,9 @@ async def get_auth_context(authorization: str | None = Header(default=None)) -> 
 
     try:
         user_response = db.anon_client().auth.get_user(token)
-    except Exception:
-        raise HTTPException(status_code=401, detail="Ungültiges oder abgelaufenes Zugriffstoken.")
+    except Exception as exc:
+        logger.error("auth.get_user failed: %s\n%s", exc, traceback.format_exc())
+        raise HTTPException(status_code=401, detail=f"Ungültiges oder abgelaufenes Zugriffstoken. ({exc})")
 
     user = getattr(user_response, "user", None)
     if not user:
