@@ -1,0 +1,1057 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>B2B AI Sales Strategist & Enablement Cockpit</title>
+  
+  <!-- SEO Meta Tags -->
+  <meta name="description" content="Entwickeln Sie B2B-Positionierungen, berechnen Sie den ROI live mit Kunden, trainieren Sie Einwände und nutzen Sie 3 E-Mail-Outreach-Vorlagen.">
+  <meta name="robots" content="index, follow">
+  
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- App Stylesheet -->
+  <link rel="stylesheet" href="style.css">
+  
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <!-- Supabase JS CDN - must load and run BEFORE the module scripts below,
+       since js/auth.js reads window.supabase.createClient synchronously at
+       module-evaluation time. A plain <script> tag here (no type="module",
+       no defer/async) guarantees that ordering. -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+
+  <script>
+    window.onerror = function(message, source, lineno, colno, error) {
+      const errorDiv = document.createElement('div');
+      errorDiv.style.position = 'fixed';
+      errorDiv.style.top = '0';
+      errorDiv.style.left = '0';
+      errorDiv.style.width = '100%';
+      errorDiv.style.background = '#ff0055';
+      errorDiv.style.color = '#fff';
+      errorDiv.style.padding = '15px';
+      errorDiv.style.zIndex = '100000';
+      errorDiv.style.fontFamily = 'monospace';
+      errorDiv.style.fontSize = '12px';
+      errorDiv.style.boxShadow = '0 4px 15px rgba(0,0,0,0.5)';
+      // Build the error message via textContent (not innerHTML) so that any
+      // untrusted text that ends up in an error message (e.g. from a thrown
+      // value containing user input) can't inject markup/scripts.
+      const line1 = document.createElement('div');
+      line1.innerHTML = '<strong>JS FEHLER:</strong> ';
+      line1.appendChild(document.createTextNode(String(message)));
+      const line2 = document.createElement('div');
+      line2.textContent = 'Datei: ' + source + ' Zeile: ' + lineno + ':' + colno;
+      errorDiv.appendChild(line1);
+      errorDiv.appendChild(line2);
+      if (error && error.stack) {
+        const pre = document.createElement('pre');
+        pre.style.marginTop = '10px';
+        pre.style.whiteSpace = 'pre-wrap';
+        pre.style.background = 'rgba(0,0,0,0.2)';
+        pre.style.padding = '10px';
+        pre.textContent = error.stack;
+        errorDiv.appendChild(pre);
+      }
+      document.body.appendChild(errorDiv);
+      return false;
+    };
+  </script>
+</head>
+<body>
+
+  <div id="no-backend-banner" style="display: none;">
+    <i data-lucide="info" style="width: 16px; height: 16px; flex-shrink: 0;"></i>
+    <span>Demo-Modus: Backend nicht erreichbar (Render-Service down, oder BACKEND_URL in js/config.js noch nicht gesetzt). Alle Berichte laufen offline mit Beispieldaten, bis die Verbindung wieder steht.</span>
+    <button type="button" id="btn-dismiss-no-backend-banner" aria-label="Hinweis schließen">&times;</button>
+  </div>
+
+  <!-- Login-Gate: blocks the app until a Supabase session exists. Shown/hidden
+       entirely by bootstrap.js - app.js's init() never runs until this is
+       dismissed via a successful sign-in or sign-up. -->
+  <div id="login-gate" style="display: none;">
+    <div class="login-card">
+      <div class="brand-title" style="justify-content: center; margin-bottom: 1.5rem;">
+        <i data-lucide="orbit" style="width: 28px; height: 28px; color: var(--accent-cyan);"></i>
+        <h1 style="font-size: 1.3rem; color: #fff; margin: 0;">OrbitAI <span style="color: var(--accent-cyan);">Sales</span></h1>
+      </div>
+      <p style="color: var(--text-muted); font-size: 0.85rem; text-align: center; margin: 0 0 1.5rem 0;">
+        Anmelden oder registrieren, um dein Cockpit zu öffnen.
+      </p>
+      <div class="form-group" style="margin-bottom: 1rem;">
+        <label style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 0.35rem;">E-Mail</label>
+        <input type="email" id="login-email" class="form-input" placeholder="du@firma.de" autocomplete="username">
+      </div>
+      <div class="form-group" style="margin-bottom: 1rem;">
+        <label style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 0.35rem;">Passwort</label>
+        <input type="password" id="login-password" class="form-input" placeholder="Mindestens 8 Zeichen" autocomplete="current-password">
+      </div>
+      <div id="login-error" class="login-message login-message-error" style="display: none;"></div>
+      <div id="login-info" class="login-message login-message-info" style="display: none;"></div>
+      <div style="display: flex; gap: 0.75rem; margin-top: 1.25rem;">
+        <button type="button" id="btn-login" class="btn btn-primary" style="flex: 1; background: var(--accent-cyan); color: #000; border-color: var(--accent-cyan);">
+          Anmelden
+        </button>
+        <button type="button" id="btn-signup" class="btn btn-outline" style="flex: 1;">
+          Registrieren
+        </button>
+      </div>
+      <div id="login-spinner" style="display: none; text-align: center; margin-top: 1rem; color: var(--text-muted); font-size: 0.8rem;">
+        Wird bearbeitet...
+      </div>
+    </div>
+  </div>
+
+  <div class="app-container">
+    <!-- SIDEBAR: Config & Demos -->
+    <aside class="sidebar">      <div class="brand-section">
+        <div class="brand-icon" style="background: transparent; box-shadow: none; width: auto; height: auto;">
+          <i data-lucide="orbit" style="width: 32px; height: 32px; color: var(--accent-cyan);"></i>
+        </div>
+        <div class="brand-title">
+          <h1 style="font-size: 1.35rem; color: #fff; background: none; -webkit-text-fill-color: initial; font-weight: 700; display: flex; align-items: center; gap: 0.25rem; margin: 0;">
+            OrbitAI <span style="color: var(--accent-cyan);">Sales</span>
+          </h1>
+        </div>
+      </div>
+      
+      <!-- API Key Area -->
+      <div class="glass-card" id="api-key-card">
+        <h2 style="display: flex; align-items: center; justify-content: space-between; width: 100%; font-size: 1rem; margin-bottom: 0.75rem;">
+          <span style="display: flex; align-items: center; gap: 0.5rem;"><i data-lucide="key" style="width: 16px; height: 16px;"></i> Gemini API Key</span>
+          <span id="api-status-dot" class="status-dot" title="Schlüssel-Status"></span>
+        </h2>
+        <div class="form-group" style="margin-bottom: 0.75rem;">
+          <div class="input-wrapper">
+            <i data-lucide="shield-alert" id="api-icon-status"></i>
+            <input type="password" id="api-key-input" class="form-input" placeholder="AI-Key hier eintragen...">
+            <button class="key-toggle" id="toggle-key-visibility" title="Schlüssel anzeigen">
+              <i data-lucide="eye"></i>
+            </button>
+          </div>
+        </div>
+        
+        <!-- Save and Validation Button -->
+        <button class="btn btn-outline btn-sm" id="btn-save-key" style="margin-top: 0.25rem; font-size: 0.8rem; padding: 0.45rem; width: 100%; margin-bottom: 0.5rem; justify-content: center; border-color: rgba(255, 255, 255, 0.15);">
+          <i data-lucide="check" style="width: 14px; height: 14px;"></i> Key aktivieren
+        </button>
+        
+        <!-- Model Selection Dropdown to bypass Free Tier limits -->
+        <div class="form-group" style="margin-top: 0.5rem; margin-bottom: 0;">
+          <div class="input-wrapper">
+            <i data-lucide="brain"></i>
+            <select id="select-model" class="form-input" style="padding-left: 2.75rem; background: rgba(10, 14, 23, 0.8); color: var(--text-main); cursor: pointer;">
+              <option value="gemini-2.5-flash" selected>Gemini 3.6 Flash (Empfohlen)</option>
+              <option value="gemini-1.5-flash">Gemini 1.5 Flash (Am stabilsten)</option>
+              <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
+            </select>
+          </div>
+        </div>
+        
+        <p style="font-size: 0.7rem; color: var(--text-dim); line-height: 1.3; margin-top: 0.75rem;">
+          Dein API-Key wird nur lokal in deinem Browser gespeichert und verschlüsselt an Googles Gemini API übermittelt.
+        </p>
+      </div>
+      
+      <!-- Prepackaged Demos -->
+      <div class="demo-section">
+        <h2 style="font-size: 0.95rem; text-transform: uppercase; color: var(--text-dim); letter-spacing: 0.05em; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
+          <i data-lucide="box"></i> Prepackaged Demos
+        </h2>
+        <div class="demo-list" id="demo-list-container">
+          <button class="demo-item" id="demo-manufacturing" data-demo="manufacturing_iot">
+            <h3>Predictive Maintenance</h3>
+            <p>Fertigung & Instandhaltung (IoT)</p>
+          </button>
+          <button class="demo-item" id="demo-logistics" data-demo="logistics_ai">
+            <h3>Logistik-KI</h3>
+            <p>Speditionen & Routen-Optimierung</p>
+          </button>
+          <button class="demo-item" id="demo-recruiting" data-demo="hr_recruiting">
+            <h3>HR Recruiting SaaS</h3>
+            <p>Mittelstand & Bewerber-Matching</p>
+          </button>
+        </div>
+      </div>
+      
+      <!-- Saved Campaigns Section -->
+      <div class="demo-section" style="margin-top: 1.5rem; border-top: 1px solid var(--border-color); padding-top: 1.5rem;">
+        <h2 style="font-size: 0.95rem; text-transform: uppercase; color: var(--text-dim); letter-spacing: 0.05em; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
+          <i data-lucide="folder-heart"></i> Deine Kampagnen
+        </h2>
+        <div class="demo-list" id="saved-campaigns-list" style="display: flex; flex-direction: column; gap: 0.5rem; max-height: 180px; overflow-y: auto; padding-right: 0.25rem;">
+          <p style="color: var(--text-dim); font-size: 0.75rem; text-align: center; font-style: italic; margin-top: 0.5rem;">Noch keine Kampagnen gespeichert.</p>
+        </div>
+      </div>
+      
+      <!-- Instructions / Help Box -->
+      <div class="glass-card" style="margin-top: auto; padding: 1rem; background: rgba(255, 255, 255, 0.01);">
+        <p style="font-size: 0.75rem; color: var(--text-muted); line-height: 1.4;">
+          <strong>Anleitung:</strong> Wähle eine Demo aus, um alle interaktiven Widgets zu laden, oder gib deinen Key ein, um eine eigene Live-Analyse zu generieren.
+        </p>
+      </div>
+    </aside>
+    
+    <!-- MAIN WORKSPACE -->
+    <main class="main-area">
+      <!-- HEADER -->
+      <header class="app-header">
+        <div class="header-title">
+          <h2>Sales Strategist & B2B Enablement Cockpit</h2>
+          <p>Live-Wertberechnungen, Einwandsbekämpfung und personalisierte Akquisitions-Vorlagen.</p>
+        </div>
+        <div class="header-actions" style="display: flex; gap: 0.75rem;">
+          <button class="btn btn-outline" id="btn-header-settings" title="Einstellungen & Whitelabel-Optionen" style="gap: 0.5rem; display: flex; align-items: center;">
+            <i data-lucide="settings" style="width: 14px; height: 14px;"></i> Setup
+          </button>
+          <button class="btn btn-outline" id="btn-logout" title="Abmelden" style="gap: 0.5rem; display: flex; align-items: center;">
+            <i data-lucide="log-out" style="width: 14px; height: 14px;"></i> Abmelden
+          </button>
+          <button class="btn-glass-scout" id="btn-header-lead-finder" title="KI Lead-Finder öffnen">
+            KI Lead-Scout
+          </button>
+          <button class="btn-glass-landingpage" id="btn-header-landingpage-generator" title="KI Landingpage-Generator öffnen">
+            KI Landingpage-Gen
+          </button>
+          <button class="btn btn-primary" id="btn-save-campaign" title="Aktuelle Kampagne & Leads speichern" style="gap: 0.5rem; width: auto; display: none;">
+            <i data-lucide="bookmark"></i> Kampagne speichern
+          </button>
+          <button class="btn btn-outline" id="btn-download-md" title="Als Markdown-Datei (.md) herunterladen" style="gap: 0.5rem;">
+            <i data-lucide="download"></i> Markdown exportieren
+          </button>
+          <button class="btn btn-outline" id="btn-print" title="Als PDF drucken / speichern">
+            <i data-lucide="printer"></i> Bericht drucken (PDF)
+          </button>
+        </div>
+      </header>
+      
+      <!-- WORKSPACE GRID -->
+      <div class="workspace-grid">
+        <!-- Spalte 1: Formular Eingabe -->
+        <section class="glass-card config-card">
+          <h2><i data-lucide="sliders-horizontal"></i> Analyse-Parameter</h2>
+          
+          <form id="strategist-form" onsubmit="return false;">
+            <!-- Kunde aus globaler Kartei wählen -->
+            <div class="form-group" style="margin-bottom: 0.75rem;">
+              <label for="select-client" style="font-size: 0.75rem; color: var(--text-muted);">Kunde aus globaler Kartei wählen (Optional)</label>
+              <div class="input-wrapper">
+                <i data-lucide="users"></i>
+                <select id="select-client" class="form-input" style="padding-left: 2.75rem; -webkit-appearance: none; background-image: url('data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"%239ca3af\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><polyline points=\"6 9 12 15 18 9\"></polyline></svg>'); background-repeat: no-repeat; background-position: right 1rem center; background-size: 1em;">
+                  <option value="">-- Kein Kunde gewählt --</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Zielgruppe / Branche -->
+            <div class="form-group">
+              <label for="input-industry">Branche / Zielgruppe</label>
+              <div class="input-wrapper">
+                <i data-lucide="target"></i>
+                <input type="text" id="input-industry" class="form-input" required placeholder="z. B. Speditionen mit eigener Lkw-Flotte...">
+              </div>
+            </div>
+            
+            <!-- Produkt / Leistung -->
+            <div class="form-group">
+              <label for="input-product">Produkt / Dienstleistung</label>
+              <div class="input-wrapper">
+                <i data-lucide="cpu"></i>
+                <input type="text" id="input-product" class="form-input" required placeholder="z. B. Routenoptimierungs-Software...">
+              </div>
+            </div>
+
+            <!-- Produkt-Link / Website (Optional) -->
+            <div class="form-group">
+              <label for="input-product-url">Produkt-Link / Website (Optional)</label>
+              <div class="input-wrapper">
+                <i data-lucide="link"></i>
+                <input type="url" id="input-product-url" class="form-input" placeholder="z. B. https://firma.de/produkt...">
+              </div>
+            </div>
+            
+            <!-- Geschäftsmodell (Read-Only da B2B festgeschrieben) -->
+            <div class="form-group">
+              <label for="input-model">Geschäftsmodell</label>
+              <div class="input-wrapper">
+                <i data-lucide="briefcase"></i>
+                <input type="text" id="input-model" class="form-input" value="B2B" readonly style="background: rgba(255, 255, 255, 0.02); color: var(--text-muted); cursor: not-allowed;">
+              </div>
+            </div>
+            
+            <button type="submit" class="btn btn-primary" id="btn-generate" style="margin-top: 1rem;">
+              <i data-lucide="zap"></i> Cockpit generieren
+            </button>
+          </form>
+        </section>
+        
+        <!-- Spalte 2: Analyse & Ergebnisse -->
+        <section class="results-wrapper">
+          
+          <!-- ERROR NOTIFICATION BOX -->
+          <div class="glass-card" id="error-card" style="display: none; border-color: var(--color-error); background: rgba(239, 68, 68, 0.06); padding: 1.5rem; margin-bottom: 1.5rem; border-left: 4px solid var(--color-error); text-align: left;">
+            <h3 style="color: var(--color-error); font-size: 1.15rem; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.5rem;">
+              <i data-lucide="alert-triangle"></i> Fehler bei der Generierung
+            </h3>
+            <p id="error-card-text" style="font-size: 0.9rem; line-height: 1.5; white-space: pre-wrap; color: var(--text-main); max-height: 250px; overflow-y: auto; padding-right: 0.5rem; margin-bottom: 0.5rem;"></p>
+            <p style="font-size: 0.75rem; color: var(--text-muted);">
+              Tipp: Überprüfe deinen Key oder wechsle links im Modell-Dropdown auf ein anderes Modell aus dieser Liste.
+            </p>
+          </div>
+
+          <!-- INITIAL WELCOME -->
+          <div class="glass-card" id="welcome-card" style="text-align: center; padding: 4rem 2rem;">
+            <div class="welcome-pulse-circle">
+              <div class="glass-eye-container">
+                <div class="glass-eye-lid">
+                  <div class="glass-eye-iris">
+                    <div class="glass-eye-pupil"></div>
+                  </div>
+                </div>
+                <div class="glass-eye-scan-ring"></div>
+              </div>
+            </div>
+            <h3 style="font-size: 1.5rem; margin-bottom: 0.75rem;">Bereit für die Analyse</h3>
+            <p style="color: var(--text-muted); max-width: 500px; margin: 0 auto 1.5rem; font-size: 0.95rem;">
+              Wähle links eine vordefinierte Demo aus, um das Cockpit inklusive des interaktiven ROI-Rechners und Einwand-Trainers sofort zu testen, oder generiere eine eigene Kampagne.
+            </p>
+            <div style="display: flex; justify-content: center; gap: 1rem; flex-wrap: wrap; align-items: center;">
+              <button class="btn btn-outline" style="width: auto; padding: 0.65rem 1.45rem; border-radius: 8px;" onclick="document.getElementById('demo-manufacturing').click();">
+                Demo laden
+              </button>
+              <button class="btn-glass-scout" id="btn-welcome-lead-finder">
+                KI Lead-Finder öffnen
+              </button>
+            </div>
+          </div>
+
+          <!-- DEDICATED LEAD FINDER CARD ON MAIN PAGE -->
+          <div class="glass-card" id="lead-finder-card-main" style="display: none; padding: 2.5rem 2rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 1rem; margin-bottom: 1.5rem;">
+              <div style="text-align: left;">
+                <h3 style="font-size: 1.5rem; color: var(--text-main); display: flex; align-items: center; gap: 0.5rem; margin: 0 0 0.25rem 0;">
+                  <i data-lucide="sparkles" style="color: var(--accent-cyan);"></i> KI B2B Lead-Scout & Prospecting
+                </h3>
+                <p style="color: var(--text-muted); font-size: 0.85rem; margin: 0;">
+                  Recherchiere automatisiert potenzielle B2B-Kunden nach Produkt und Ort.
+                </p>
+              </div>
+              <button class="btn btn-outline" id="btn-back-to-welcome" style="width: auto; gap: 0.25rem;">
+                <i data-lucide="arrow-left"></i> Zurück
+              </button>
+            </div>
+
+            <!-- Form -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; text-align: left;">
+              <div class="form-group">
+                <label style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 0.35rem;">Produkt / Dienstleistung / Lösung</label>
+                <div class="input-wrapper">
+                  <i data-lucide="cpu"></i>
+                  <input type="text" id="finder-product-main" class="form-input" placeholder="z.B. Ladeinfrastruktur für E-Autos">
+                </div>
+              </div>
+              <div class="form-group">
+                <label style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 0.35rem;">Region / Stadt / Gebiet</label>
+                <div class="input-wrapper">
+                  <i data-lucide="map-pin"></i>
+                  <input type="text" id="finder-region-main" class="form-input" placeholder="z.B. Hamburg">
+                </div>
+              </div>
+              <div class="form-group">
+                <label style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 0.35rem;">Zielbranche (Optional)</label>
+                <div class="input-wrapper">
+                  <i data-lucide="target"></i>
+                  <input type="text" id="finder-industry-main" class="form-input" placeholder="z.B. Luxus-Hotellerie">
+                </div>
+              </div>
+            </div>
+
+            <div style="display: flex; justify-content: flex-end;">
+              <button class="btn btn-primary" id="btn-run-finder-main" style="width: auto; gap: 0.5rem; background: var(--accent-cyan); color: #000; border-color: var(--accent-cyan);">
+                <i data-lucide="sparkles"></i> KI-Recherche starten
+              </button>
+            </div>
+
+            <!-- Loading Spinner -->
+            <div id="finder-loading-main" style="display: none; align-items: center; justify-content: center; flex-direction: column; padding: 2.5rem 0; gap: 0.75rem;">
+              <div class="loader-spinner"></div>
+              <span style="font-size: 0.9rem; color: var(--text-muted);">Analysiere B2B-Marktsegmente & scoute Leads...</span>
+            </div>
+
+            <!-- Results -->
+            <div id="finder-results-main" style="display: none; margin-top: 1.5rem; border-top: 1px solid var(--border-color); padding-top: 1.5rem;">
+              <h4 style="font-size: 1rem; color: var(--text-main); margin-bottom: 1rem; text-align: left;">Gefundene B2B-Abnehmer:</h4>
+              <div id="finder-results-list-main" style="display: flex; flex-direction: column; gap: 1rem; max-height: 400px; overflow-y: auto; padding-right: 0.25rem;">
+                <!-- Filled dynamically -->
+              </div>
+            </div>
+          </div>
+
+          <!-- Whitelabel & Admin Settings Card -->
+          <div class="glass-card" id="settings-card" style="display: none; padding: 2.5rem 2rem; flex-direction: column; justify-content: flex-start; text-align: left;">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 1rem; margin-bottom: 1.5rem;">
+              <div style="text-align: left;">
+                <h3 style="font-size: 1.5rem; color: var(--text-main); display: flex; align-items: center; gap: 0.5rem; margin: 0 0 0.25rem 0;">
+                  <i data-lucide="settings" style="color: var(--accent-cyan); width: 24px; height: 24px;"></i> Whitelabel & Admin Setup
+                </h3>
+                <p style="color: var(--text-muted); font-size: 0.85rem; margin: 0;">
+                  Passe das Branding der App an, schütze sensible Bereiche und ändere Farbthemen für deine Endkunden.
+                </p>
+              </div>
+              <button class="btn btn-outline" id="btn-back-from-settings" style="width: auto; gap: 0.25rem;">
+                <i data-lucide="arrow-left"></i> Zurück
+              </button>
+            </div>
+
+            <!-- Settings Form Grid -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 2rem; margin-bottom: 1.5rem;">
+              
+              <!-- Column 1: Branding -->
+              <div>
+                <h4 style="font-size: 1.1rem; color: var(--accent-cyan); margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
+                  <i data-lucide="palette"></i> App-Design & Branding
+                </h4>
+                <div class="form-group" style="margin-bottom: 1.25rem;">
+                  <label style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 0.35rem;">App-Name (Header & Tab-Titel)</label>
+                  <input type="text" id="setting-app-name" class="form-input" placeholder="OrbitAI Sales">
+                </div>
+                <div class="form-group" style="margin-bottom: 1.25rem;">
+                  <label style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 0.35rem;">Accent-Farbe (Farbthema)</label>
+                  <div style="display: flex; gap: 0.5rem; align-items: center;">
+                    <input type="color" id="setting-app-color" style="border: 1px solid var(--border-color); border-radius: 6px; width: 45px; height: 40px; background: transparent; cursor: pointer; padding: 2px;">
+                    <span style="font-size: 0.85rem; color: var(--text-muted);" id="color-hex-label">#00f2fe</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Column 2: API & Security -->
+              <div>
+                <h4 style="font-size: 1.1rem; color: var(--accent-cyan); margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
+                  <i data-lucide="lock"></i> API-Schutz & Sicherheit
+                </h4>
+                <div class="form-group" style="margin-bottom: 1.25rem; display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem 0;">
+                  <input type="checkbox" id="setting-hide-key" style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--accent-cyan);">
+                  <label for="setting-hide-key" style="font-size: 0.85rem; color: var(--text-main); cursor: pointer; user-select: none;">
+                    API-Key Kärtchen in Sidebar ausblenden
+                  </label>
+                </div>
+                <div class="form-group" style="margin-bottom: 1.25rem;">
+                  <label style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 0.35rem;">Admin-Passwort zum Sperren des Setups</label>
+                  <input type="password" id="setting-admin-pass" class="form-input" placeholder="Leer lassen = unverändert">
+                  <p style="font-size: 0.7rem; color: var(--text-dim); margin-top: 0.35rem; line-height: 1.3;">
+                    Hinweis: Das ist nur eine leichte Sperre gegen versehentliches Öffnen, kein echter Zugriffsschutz - jeder mit Zugriff auf die Browser-Entwicklertools kann sie umgehen.
+                  </p>
+                </div>
+              </div>
+
+            </div>
+
+            <!-- Data Backup: all campaign/client/lead data lives only in this browser's
+                 localStorage, so clearing site data or switching devices/browsers loses
+                 it permanently unless it's exported here first. -->
+            <div style="border-top: 1px solid var(--border-color); padding-top: 1.5rem; margin-top: 0.5rem;">
+              <h4 style="font-size: 1.1rem; color: var(--accent-cyan); margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.5rem;">
+                <i data-lucide="database-backup"></i> Daten-Backup
+              </h4>
+              <p style="color: var(--text-muted); font-size: 0.85rem; margin: 0 0 1rem 0;">
+                Kampagnen, Kundenkartei und Leads werden nur lokal im Browser gespeichert. Beim Löschen der Browserdaten oder auf einem anderen Gerät sind sie sonst weg - hier als Datei sichern oder wiederherstellen.
+              </p>
+              <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+                <button class="btn btn-outline" id="btn-export-backup" style="width: auto; gap: 0.5rem;">
+                  <i data-lucide="download"></i> Backup exportieren (JSON)
+                </button>
+                <button class="btn btn-outline" id="btn-import-backup" style="width: auto; gap: 0.5rem;">
+                  <i data-lucide="upload"></i> Backup importieren
+                </button>
+                <input type="file" id="backup-file-input" accept="application/json" style="display: none;">
+              </div>
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; gap: 1rem; margin-top: 1rem; border-top: 1px solid var(--border-color); padding-top: 1.5rem;">
+              <button class="btn btn-outline" id="btn-reset-settings" style="width: auto; gap: 0.25rem;">
+                <i data-lucide="refresh-cw"></i> Werkseinstellungen
+              </button>
+              <button class="btn btn-primary" id="btn-save-settings" style="width: auto; gap: 0.5rem; background: var(--accent-cyan); color: #000; border-color: var(--accent-cyan);">
+                <i data-lucide="save"></i> Setup speichern
+              </button>
+            </div>
+          </div>
+          
+          <!-- LOADING STATE -->
+          <div class="glass-card loading-indicator" id="loading-indicator">
+            <div class="loader-spinner"></div>
+            <div class="loading-text" id="loading-text-status">Marktpotenzial wird ermittelt...</div>
+            <p style="color: var(--text-muted); font-size: 0.85rem; max-width: 300px;">
+              Die KI durchsucht Marktmechanismen, strukturiert Pain Points und bereitet das Vertriebs-Playbook vor. Das kann bis zu 15 Sekunden dauern.
+            </p>
+          </div>
+          
+          <!-- OUTPUT CONTENT (REPORT) -->
+          <div class="report-container" id="report-container">
+            
+            <!-- Context Banner -->
+            <div class="profile-overview-banner">
+              <div class="overview-item">
+                <span class="label">Branche & Zielmarkt</span>
+                <span class="value" id="overview-industry">-</span>
+              </div>
+              <div class="overview-item">
+                <span class="label">B2B Produkt / Service</span>
+                <span class="value" id="overview-product">-</span>
+              </div>
+              <div class="overview-item">
+                <span class="label">Geschäftsmodell</span>
+                <span class="value" id="overview-model">B2B</span>
+              </div>
+            </div>
+            
+            <!-- Tabs Menu (6 Tabs Now!) -->
+            <nav class="tab-navigation">
+              <button class="tab-btn active" data-target="panel-module1" id="tab-module1">
+                <i data-lucide="search"></i> 1. Schmerzpunkte
+              </button>
+              <button class="tab-btn" data-target="panel-module-fit" id="tab-module-fit">
+                <i data-lucide="handshake"></i> 2. Eignungs-Fit
+              </button>
+              <button class="tab-btn" data-target="panel-module2" id="tab-module2">
+                <i data-lucide="check-circle2"></i> 3. Validierung & ROI
+              </button>
+              <button class="tab-btn" data-target="panel-module3" id="tab-module3">
+                <i data-lucide="map"></i> 4. Go-To-Market
+              </button>
+              <button class="tab-btn" data-target="panel-module4" id="tab-module4">
+                <i data-lucide="play-circle"></i> 5. Playbook & Tools
+              </button>
+              <button class="tab-btn" data-target="panel-crm" id="tab-crm">
+                <i data-lucide="users"></i> 6. Leads & CRM
+              </button>
+            </nav>
+            
+            <!-- Panel 1: Bedarf & Pain Points -->
+            <div class="glass-card tab-panel active" id="panel-module1">
+              <div class="markdown-body" id="content-module1">
+                <!-- Dynamically filled -->
+              </div>
+            </div>
+            
+            <!-- Panel 2: Eignungs-Fit (Argumentationsliste) -->
+            <div class="glass-card tab-panel" id="panel-module-fit">
+              <div class="markdown-body" id="content-module-fit">
+                <!-- Dynamically filled -->
+              </div>
+            </div>
+            
+            <!-- Panel 3: Brauchbarkeit, Validierung & ROI Rechner -->
+            <div class="glass-card tab-panel" id="panel-module2">
+              <div class="markdown-body" id="content-module2">
+                <!-- Dynamically filled -->
+              </div>
+               <!-- INTERACTIVE ROI CALCULATOR WIDGET (Retail & POS Margin Focus) -->
+              <div class="roi-calculator-container" id="roi-calculator">
+                <h3><i data-lucide="calculator"></i> Handelsmarge & POS-Hebel Rechner</h3>
+                <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1.25rem;">
+                  Berechne die Händlermarge und ermittle, welchen Zusatzumsatz eine erstklassige POS-Präsentation (Zweitplatzierung, Aufsteller, Display) für den Händler generiert.
+                </p>
+                
+                <div class="calculator-grid">
+                  <!-- Sliders Left -->
+                  <div class="calc-sliders">
+                    <!-- Einkaufspreis (EK) -->
+                    <div class="calc-group">
+                      <div class="calc-label-row">
+                        <span class="label">Einkaufspreis (B2B-EK) pro Stück</span>
+                        <span class="val" id="calc-ek-val">40 €</span>
+                      </div>
+                      <input type="range" id="slider-ek" class="calc-slider" min="1" max="1000" step="1" value="40">
+                    </div>
+                    
+                    <!-- Verkaufspreis (UVP) -->
+                    <div class="calc-group">
+                      <div class="calc-label-row">
+                        <span class="label">Verkaufspreis (UVP) an Endkunden</span>
+                        <span class="val" id="calc-uvp-val">99 €</span>
+                      </div>
+                      <input type="range" id="slider-uvp" class="calc-slider" min="2" max="2000" step="1" value="99">
+                    </div>
+                    
+                    <!-- Absatzmenge pro Monat -->
+                    <div class="calc-group">
+                      <div class="calc-label-row">
+                        <span class="label">Geplante Absatzmenge / Monat</span>
+                        <span class="val" id="calc-qty-val">300 Stk.</span>
+                      </div>
+                      <input type="range" id="slider-qty" class="calc-slider" min="10" max="5000" step="10" value="300">
+                    </div>
+                    
+                    <!-- POS-Boost -->
+                    <div class="calc-group">
+                      <div class="calc-label-row">
+                        <span class="label">Absatz-Steigerung durch POS-Aufbau / Display</span>
+                        <span class="val" id="calc-pos-val">30 %</span>
+                      </div>
+                      <input type="range" id="slider-pos" class="calc-slider" min="0" max="100" step="5" value="30">
+                    </div>
+
+                    <!-- Cross-Selling -->
+                    <div class="calc-group">
+                      <div class="calc-label-row">
+                        <span class="label">Zusatz-Umsatz (Cross-Selling / Zubehör) pro Kauf</span>
+                        <span class="val" id="calc-cross-val">10 €</span>
+                      </div>
+                      <input type="range" id="slider-cross" class="calc-slider" min="0" max="200" step="1" value="10">
+                    </div>
+                  </div>
+                  
+                  <!-- Outputs Right -->
+                  <div class="calc-results">
+                    <div class="calc-result-box">
+                      <span class="title">Handelsmarge pro Stück (absolut / relativ)</span>
+                      <span class="number" id="calc-margin-total">59,00 € (59.6%)</span>
+                    </div>
+                    
+                    <div class="calc-result-box">
+                      <span class="title">Gesamter Monatsgewinn (mit POS-Präsentation)</span>
+                      <span class="number" id="calc-profit-monthly">24.210,00 €</span>
+                    </div>
+                    
+                    <div class="calc-result-box highlight">
+                      <span class="title">Mehrgewinn / Jahr durch POS-Hebel</span>
+                      <span class="number" id="calc-benefit-annual">63.720,00 €</span>
+                    </div>
+
+                    <!-- Visual Chart Comparison -->
+                    <div style="margin-top: 1.25rem; background: rgba(255,255,255,0.02); padding: 1rem; border-radius: 8px; border: 1px dashed rgba(255,255,255,0.05);">
+                      <span style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); display: block; margin-bottom: 0.75rem;">Visueller Ertrags-Vergleich (Monatlich)</span>
+                      
+                      <!-- Bar 1: Ohne POS -->
+                      <div style="margin-bottom: 0.75rem;">
+                        <div style="display: flex; justify-content: space-between; font-size: 0.75rem; margin-bottom: 0.25rem;">
+                          <span>Ohne POS-Hebel</span>
+                          <span id="chart-val-standard" style="color: var(--text-muted);">17.700,00 €</span>
+                        </div>
+                        <div style="height: 8px; background: rgba(255,255,255,0.08); border-radius: 4px; overflow: hidden;">
+                          <div id="chart-bar-standard" style="height: 100%; width: 70%; background: rgba(156, 163, 175, 0.5); transition: width 0.3s ease;"></div>
+                        </div>
+                      </div>
+                      
+                      <!-- Bar 2: Mit POS -->
+                      <div>
+                        <div style="display: flex; justify-content: space-between; font-size: 0.75rem; margin-bottom: 0.25rem;">
+                          <span style="color: var(--accent-cyan); font-weight: 500;">Mit POS-Hebel (Marge + Cross-Sell)</span>
+                          <span id="chart-val-optimized" style="color: var(--accent-cyan); font-weight: bold;">24.210,00 €</span>
+                        </div>
+                        <div style="height: 8px; background: rgba(0, 242, 254, 0.08); border-radius: 4px; overflow: hidden;">
+                          <div id="chart-bar-optimized" style="height: 100%; width: 100%; background: linear-gradient(90deg, #00f2fe, #4facfe); transition: width 0.3s ease;"></div>
+                        </div>
+                      </div>
+                    </div>
+                </div>
+              </div>
+            </div>
+            </div>
+            
+            <!-- Panel 4: Go-To-Market -->
+            <div class="glass-card tab-panel" id="panel-module3">
+              <div class="markdown-body" id="content-module3">
+                <!-- Dynamically filled -->
+              </div>
+            </div>
+            
+            <!-- Panel 5: Operatives Playbook & Interactive Tools -->
+            <div class="glass-card tab-panel" id="panel-module4">
+              
+              <!-- 3 Outreach Email Templates Sektion -->
+              <div class="email-box-container">
+                <h3 style="font-size: 1.25rem; margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.5rem; color: var(--text-main);">
+                  <i data-lucide="mail"></i> 1. Outreach E-Mail Vorlagen (3 Varianten)
+                </h3>
+                <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1.25rem;">
+                  Wähle das passende Pitch-Format für deine Kaltakquise und kopiere es mit einem Klick.
+                </p>
+                
+                <!-- Email Personalization Form -->
+                <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 8px; padding: 1rem; margin-bottom: 1.25rem; display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.75rem;">
+                  <div>
+                    <label style="font-size: 0.7rem; color: var(--text-muted); display: block; margin-bottom: 0.25rem;">Ansprechpartner (z. B. Herr Schmidt)</label>
+                    <input type="text" id="email-contact-name" class="form-input" style="font-size: 0.8rem; padding: 0.4rem 0.75rem;" placeholder="Herr Schmidt">
+                  </div>
+                  <div>
+                    <label style="font-size: 0.7rem; color: var(--text-muted); display: block; margin-bottom: 0.25rem;">Firmenname des Kunden</label>
+                    <input type="text" id="email-client-company" class="form-input" style="font-size: 0.8rem; padding: 0.4rem 0.75rem;" placeholder="Möbel-Müller GmbH">
+                  </div>
+                  <div>
+                    <label style="font-size: 0.7rem; color: var(--text-muted); display: block; margin-bottom: 0.25rem;">Dein Name (Absender)</label>
+                    <input type="text" id="email-sender-name" class="form-input" style="font-size: 0.8rem; padding: 0.4rem 0.75rem;" placeholder="Stefan Vielhaber">
+                  </div>
+                </div>
+
+                <div class="email-tabs">
+                  <button class="email-tab-btn active" data-email="email-a" id="btn-email-a">Option A: Nutzenfokus</button>
+                  <button class="email-tab-btn" data-email="email-b" id="btn-email-b">Option B: Social Proof</button>
+                  <button class="email-tab-btn" data-email="email-c" id="btn-email-c">Option C: Soft Outreach</button>
+                </div>
+                
+                <!-- Email Panel A -->
+                <div class="email-panel active" id="email-panel-a">
+                  <div class="markdown-body" id="container-email-a"></div>
+                </div>
+                
+                <!-- Email Panel B -->
+                <div class="email-panel" id="email-panel-b">
+                  <div class="markdown-body" id="container-email-b"></div>
+                </div>
+                
+                <!-- Email Panel C -->
+                <div class="email-panel" id="email-panel-c">
+                  <div class="markdown-body" id="container-email-c"></div>
+                </div>
+              </div>
+
+              <!-- Content für Qualifizierungsfragen -->
+              <div class="markdown-body" id="content-module4-questions" style="margin-bottom: 2rem;">
+                <!-- Dynamically filled (Questions) -->
+              </div>
+
+              <!-- Interactive Objection Trainer -->
+              <div style="border-top: 1px solid var(--border-color); padding-top: 1.5rem; margin-bottom: 2rem;">
+                <h3 style="font-size: 1.25rem; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.5rem; color: var(--text-main);">
+                  <i data-lucide="shield-alert"></i> 2. Interaktiver Einwand-Trainer
+                </h3>
+                <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1rem;">
+                  Klicke auf den Einwand des Kunden, um die psychologische Konter-Strategie (LAER-Methode) sofort aufzudecken.
+                </p>
+                
+                <div class="objections-grid" id="objections-container">
+                  <!-- Dynamically filled -->
+                </div>
+              </div>
+
+              <!-- 14-Tage Nachfass-Sequenz -->
+              <div style="border-top: 1px solid var(--border-color); padding-top: 1.5rem;">
+                <h3 style="font-size: 1.25rem; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.5rem; color: var(--text-main);">
+                  <i data-lucide="calendar"></i> 3. Dranbleib-Playbook (14-Tage-Sequenz)
+                </h3>
+                <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1.25rem;">
+                  Der Ablaufplan für das systematische Nachfassen nach dem Erstkontakt.
+                </p>
+                
+                <div class="timeline-container" id="timeline-container">
+                  <!-- Dynamically filled -->
+                </div>
+              </div>
+
+            </div> <!-- /panel-module4 -->
+            
+            <!-- Panel 6: Leads & CRM -->
+            <div class="glass-card tab-panel" id="panel-crm">
+              <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 1rem; margin-bottom: 1.5rem;">
+                <div>
+                  <h3 style="font-size: 1.25rem; color: var(--text-main); display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem;">
+                    <i data-lucide="users"></i> Lead Board & CRM
+                  </h3>
+                  <p style="color: var(--text-muted); font-size: 0.85rem;">
+                    Verwalte deine Leads für diese Kampagne. Daten werden lokal in deinem Browser gespeichert.
+                  </p>
+                </div>
+                <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                  <input type="file" id="csv-file-input" accept=".csv" style="display: none;">
+                  <button class="btn btn-outline" id="btn-import-csv" style="width: auto; gap: 0.5rem; font-size: 0.8rem; padding: 0.4rem 0.75rem;" title="Globale Kundenkartei per CSV importieren">
+                    <i data-lucide="upload"></i> CSV importieren
+                  </button>
+                  <button class="btn btn-outline" id="btn-show-directory" style="width: auto; gap: 0.5rem; font-size: 0.8rem; padding: 0.4rem 0.75rem;" title="Globale Kundenkartei anzeigen">
+                    <i data-lucide="folder-open"></i> Kundenkartei (<span id="client-count">0</span>)
+                  </button>
+                  <button class="btn btn-outline" id="btn-show-lead-finder" style="width: auto; gap: 0.5rem; font-size: 0.8rem; padding: 0.4rem 0.75rem; border-color: var(--accent-cyan); color: var(--accent-cyan);" title="KI Lead-Finder starten">
+                    <i data-lucide="sparkles" style="width: 14px; height: 14px;"></i> KI Lead-Finder
+                  </button>
+                  <button class="btn btn-outline" id="btn-export-leads" onclick="window.exportLeadsToCSV()" style="width: auto; gap: 0.5rem; font-size: 0.8rem; padding: 0.4rem 0.75rem;" title="Alle Leads dieser Kampagne als CSV exportieren">
+                    <i data-lucide="download"></i> Leads exportieren
+                  </button>
+                  <button class="btn btn-primary" id="btn-add-lead" style="width: auto; gap: 0.5rem; font-size: 0.8rem; padding: 0.4rem 0.75rem;">
+                    <i data-lucide="user-plus"></i> Lead hinzufügen
+                  </button>
+                </div>
+              </div>
+
+              <!-- KI Lead-Finder Maske (collapsible) -->
+              <div id="lead-finder-container" style="display: none; background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 8px; padding: 1.25rem; margin-bottom: 1.5rem;">
+                <h4 style="font-size: 0.95rem; margin-bottom: 0.5rem; color: var(--accent-cyan); display: flex; align-items: center; gap: 0.25rem;">
+                  <i data-lucide="sparkles" style="width: 16px; height: 16px;"></i> KI-gestütztes Lead-Scouting (B2B)
+                </h4>
+                <p style="color: var(--text-muted); font-size: 0.75rem; margin-bottom: 1rem;">
+                  Gib dein Produkt und die Region ein, um potenzielle B2B-Abnehmer ausfindig zu machen.
+                </p>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.75rem; margin-bottom: 1rem;">
+                  <div>
+                    <label style="font-size: 0.7rem; color: var(--text-muted); display: block; margin-bottom: 0.25rem;">Produkt / Lösung</label>
+                    <input type="text" id="finder-product" class="form-input" style="font-size: 0.8rem; padding: 0.4rem 0.75rem;" placeholder="z.B. Ladeinfrastruktur für E-Autos">
+                  </div>
+                  <div>
+                    <label style="font-size: 0.7rem; color: var(--text-muted); display: block; margin-bottom: 0.25rem;">Region / Stadt</label>
+                    <input type="text" id="finder-region" class="form-input" style="font-size: 0.8rem; padding: 0.4rem 0.75rem;" placeholder="z.B. München">
+                  </div>
+                  <div>
+                    <label style="font-size: 0.7rem; color: var(--text-muted); display: block; margin-bottom: 0.25rem;">Branche (Optional)</label>
+                    <input type="text" id="finder-industry" class="form-input" style="font-size: 0.8rem; padding: 0.4rem 0.75rem;" placeholder="z.B. Hotels & Gastronomie">
+                  </div>
+                </div>
+                
+                <div style="display: flex; justify-content: flex-end; gap: 0.5rem;">
+                  <button class="btn btn-outline" id="btn-cancel-finder" style="width: auto; padding: 0.4rem 1rem; font-size: 0.8rem;">Abbrechen</button>
+                  <button class="btn btn-primary" id="btn-run-finder" style="width: auto; padding: 0.4rem 1rem; font-size: 0.8rem; gap: 0.25rem; background: var(--accent-cyan); color: #000; border-color: var(--accent-cyan);">
+                    <i data-lucide="sparkles" style="width: 14px; height: 14px;"></i> Leads scouten
+                  </button>
+                </div>
+
+                <!-- Finder Loading Indicator -->
+                <div id="finder-loading" style="display: none; align-items: center; justify-content: center; flex-direction: column; padding: 1.5rem; gap: 0.5rem;">
+                  <div class="spinner" style="width: 24px; height: 24px; border-width: 3px;"></div>
+                  <span style="font-size: 0.8rem; color: var(--text-muted);">Recherchiere potenzielle B2B-Kunden in der Region...</span>
+                </div>
+
+                <!-- Finder Results Container -->
+                <div id="finder-results" style="display: none; margin-top: 1.25rem; border-top: 1px solid var(--border-color); padding-top: 1.25rem;">
+                  <h5 style="font-size: 0.85rem; margin-bottom: 0.75rem; color: var(--text-main);">Gefundene Abnehmer:</h5>
+                  <div id="finder-results-list" style="display: flex; flex-direction: column; gap: 0.75rem; max-height: 300px; overflow-y: auto; padding-right: 0.25rem;">
+                    <!-- Dynamically filled with client cards -->
+                  </div>
+                </div>
+              </div>
+
+              <!-- Global Client Directory (collapsible) -->
+              <div id="directory-container" style="display: none; background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 8px; padding: 1.25rem; margin-bottom: 1.5rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                  <h4 style="font-size: 0.95rem; color: var(--accent-cyan); margin: 0;">Globale Kundenkartei</h4>
+                  <button class="btn btn-outline btn-sm" id="btn-clear-directory" style="width: auto; color: var(--color-error); border-color: var(--color-error); padding: 0.25rem 0.5rem; font-size: 0.75rem;">Kartei leeren</button>
+                </div>
+                <p style="color: var(--text-muted); font-size: 0.75rem; margin-bottom: 1rem;">
+                  Diese Kunden stehen global für Analysen zur Verfügung. Lade sie per CSV hoch. Spalten-Format: <code>Firma,Ansprechpartner,E-Mail,Branche,Website,Produkt</code>
+                </p>
+                <div style="overflow-x: auto; background: rgba(0,0,0,0.2); border-radius: 6px; border: 1px solid var(--border-color); max-height: 250px; overflow-y: auto;">
+                  <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.8rem;">
+                    <thead>
+                      <tr style="background: rgba(255,255,255,0.02); border-bottom: 1px solid var(--border-color);">
+                        <th style="padding: 0.5rem 0.75rem; color: var(--text-muted); font-weight: 600;">Firma</th>
+                        <th style="padding: 0.5rem 0.75rem; color: var(--text-muted); font-weight: 600;">Kontakt</th>
+                        <th style="padding: 0.5rem 0.75rem; color: var(--text-muted); font-weight: 600;">E-Mail</th>
+                        <th style="padding: 0.5rem 0.75rem; color: var(--text-muted); font-weight: 600;">Branche</th>
+                        <th style="padding: 0.5rem 0.75rem; color: var(--text-muted); font-weight: 600;">Website</th>
+                        <th style="padding: 0.5rem 0.75rem; color: var(--text-muted); font-weight: 600;">Produkt</th>
+                      </tr>
+                    </thead>
+                    <tbody id="directory-table-body">
+                      <!-- Dynamically filled -->
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <!-- Lead Addition Form (collapsible) -->
+              <div id="lead-form-container" style="display: none; background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 8px; padding: 1.25rem; margin-bottom: 1.5rem;">
+                <h4 style="font-size: 0.95rem; margin-bottom: 0.75rem; color: var(--accent-cyan);">Neuen Lead anlegen</h4>
+                <form id="crm-lead-form" onsubmit="return false;" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.75rem;">
+                  <div>
+                    <label style="font-size: 0.7rem; color: var(--text-muted); display: block; margin-bottom: 0.25rem;">Firmenname *</label>
+                    <input type="text" id="lead-company" class="form-input" style="font-size: 0.8rem; padding: 0.4rem 0.75rem;" required placeholder="z.B. Schmidt Handels GmbH">
+                  </div>
+                  <div>
+                    <label style="font-size: 0.7rem; color: var(--text-muted); display: block; margin-bottom: 0.25rem;">Ansprechpartner</label>
+                    <input type="text" id="lead-contact" class="form-input" style="font-size: 0.8rem; padding: 0.4rem 0.75rem;" placeholder="z.B. Herr Schmidt">
+                  </div>
+                  <div>
+                    <label style="font-size: 0.7rem; color: var(--text-muted); display: block; margin-bottom: 0.25rem;">E-Mail-Adresse</label>
+                    <input type="email" id="lead-email" class="form-input" style="font-size: 0.8rem; padding: 0.4rem 0.75rem;" placeholder="schmidt@firma.de">
+                  </div>
+                  <div>
+                    <label style="font-size: 0.7rem; color: var(--text-muted); display: block; margin-bottom: 0.25rem;">Telefonnummer</label>
+                    <input type="text" id="lead-phone" class="form-input" style="font-size: 0.8rem; padding: 0.4rem 0.75rem;" placeholder="z.B. +49 89 123456">
+                  </div>
+                  <div>
+                    <label style="font-size: 0.7rem; color: var(--text-muted); display: block; margin-bottom: 0.25rem;">Status</label>
+                    <select id="lead-status" class="form-input" style="font-size: 0.8rem; padding: 0.4rem 0.75rem;">
+                      <option value="Neu">Neu</option>
+                      <option value="E-Mail gesendet">E-Mail gesendet</option>
+                      <option value="Erstgespräch">Erstgespräch</option>
+                      <option value="Angebot">Angebot</option>
+                      <option value="Gewonnen">Gewonnen</option>
+                      <option value="Abgelehnt">Abgelehnt</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style="font-size: 0.7rem; color: var(--text-muted); display: block; margin-bottom: 0.25rem;">Kaufpotenzial</label>
+                    <select id="lead-potenzial" class="form-input" style="font-size: 0.8rem; padding: 0.4rem 0.75rem;">
+                      <option value="Hoch">Hoch</option>
+                      <option value="Mittel" selected>Mittel</option>
+                      <option value="Gering">Gering</option>
+                    </select>
+                  </div>
+                  <div style="grid-column: 1 / -1;">
+                    <label style="font-size: 0.7rem; color: var(--text-muted); display: block; margin-bottom: 0.25rem;">Notizen / Nächste Schritte</label>
+                    <input type="text" id="lead-notes" class="form-input" style="font-size: 0.8rem; padding: 0.4rem 0.75rem;" placeholder="z.B. Sucht nach einer Kaffeemaschinen-POS-Lösung...">
+                  </div>
+                  <div style="grid-column: 1 / -1; display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 0.5rem;">
+                    <button class="btn btn-outline" id="btn-cancel-lead" style="width: auto; padding: 0.4rem 1rem; font-size: 0.8rem;">Abbrechen</button>
+                    <button type="submit" class="btn btn-primary" style="width: auto; padding: 0.4rem 1rem; font-size: 0.8rem;">Speichern</button>
+                  </div>
+                </form>
+              </div>
+
+              <!-- Leads Table -->
+              <div style="overflow-x: auto; background: rgba(0,0,0,0.1); border-radius: 8px; border: 1px solid var(--border-color);">
+                <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem;">
+                  <thead>
+                    <tr style="background: rgba(255,255,255,0.03); border-bottom: 1px solid var(--border-color);">
+                      <th style="padding: 0.75rem 1rem; font-weight: 600; color: var(--text-muted);">Firma</th>
+                      <th style="padding: 0.75rem 1rem; font-weight: 600; color: var(--text-muted);">Kontakt</th>
+                      <th style="padding: 0.75rem 1rem; font-weight: 600; color: var(--text-muted);">E-Mail</th>
+                      <th style="padding: 0.75rem 1rem; font-weight: 600; color: var(--text-muted);">Telefon</th>
+                      <th style="padding: 0.75rem 1rem; font-weight: 600; color: var(--text-muted);">Potenzial</th>
+                      <th style="padding: 0.75rem 1rem; font-weight: 600; color: var(--text-muted);">Status</th>
+                      <th style="padding: 0.75rem 1rem; font-weight: 600; color: var(--text-muted);">Notizen</th>
+                      <th style="padding: 0.75rem 1rem; font-weight: 600; text-align: right; color: var(--text-muted);">Aktionen</th>
+                    </tr>
+                  </thead>
+                  <tbody id="crm-leads-table-body">
+                    <!-- Dynamically filled -->
+                  </tbody>
+                </table>
+              </div>
+            </div> <!-- /panel-crm -->
+            
+          </div> <!-- /report-container -->
+
+          <!-- Chat Assistant Section (Always Visible) -->
+          <div class="glass-card" id="chat-assistant-card" style="margin-top: 1.5rem; padding: 1.5rem; text-align: left; display: flex; flex-direction: column; gap: 1rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 0.75rem;">
+              <div>
+                <h3 style="font-size: 1.15rem; color: var(--text-main); display: flex; align-items: center; gap: 0.5rem; margin: 0 0 0.25rem 0;">
+                  <i data-lucide="messages-square" style="color: var(--accent-cyan); width: 20px; height: 20px;"></i> KI-Vertriebsassistent (OrbitAI Chat & Copilot)
+                </h3>
+                <p style="color: var(--text-muted); font-size: 0.8rem; margin: 0;">
+                  Kommuniziere direkt mit der KI für allgemeine B2B-Anfragen oder steuere das System per Sprache (z.B. "Analysiere...", "Scoute Leads...", "Wechsle zu...").
+                </p>
+              </div>
+            </div>
+            
+            <!-- Chat history window -->
+            <div id="chat-messages-box" style="display: flex; flex-direction: column; gap: 0.75rem; max-height: 250px; overflow-y: auto; padding-right: 0.5rem; background: rgba(0,0,0,0.15); border: 1px solid var(--border-color); border-radius: 8px; padding: 1rem;">
+              <div style="background: rgba(255,255,255,0.02); border-left: 3px solid var(--accent-cyan); border-radius: 4px; padding: 0.5rem 0.75rem; font-size: 0.85rem; color: var(--text-main); line-height: 1.4; max-width: 85%;">
+                <strong>OrbitAI:</strong> Hallo! Ich bin dein intelligenter B2B-Sales-Copilot. Was kann ich für dich tun? Du kannst mir allgemeine B2B-Fragen stellen, die offene Analyse anpassen oder mich per Sprache steuern (z.B. <em>"Analysiere Logistik für Paket-Scanner"</em>, <em>"Wechsle zum ROI-Rechner"</em> oder <em>"Exportiere die Leads"</em>)!
+              </div>
+            </div>
+
+            <!-- Input group -->
+            <div style="display: flex; gap: 0.5rem; align-items: center; position: relative;">
+              <button class="btn btn-outline" id="btn-chat-mic" style="width: 45px; height: 45px; padding: 0; display: flex; align-items: center; justify-content: center; border-radius: 10px;" title="Nachricht diktieren (Speech-to-Text)">
+                <i data-lucide="mic" style="width: 18px; height: 18px;"></i>
+              </button>
+              <input type="text" id="chat-input" class="form-input" style="padding-left: 1rem; height: 45px; font-size: 0.85rem; border-radius: 10px;" placeholder="Frage die KI oder steuere das System per Sprache...">
+              <button class="btn btn-primary" id="btn-chat-send" style="width: 45px; height: 45px; padding: 0; display: flex; align-items: center; justify-content: center; background: var(--accent-cyan); color: #000; border-color: var(--accent-cyan); border-radius: 10px;" title="Nachricht senden">
+                <i data-lucide="send" style="width: 18px; height: 18px;"></i>
+              </button>
+            </div>
+          </div>
+        </section>
+      </div> <!-- /workspace-grid -->
+    </main>
+  </div>
+
+  <!-- LANDINGPAGE GENERATOR VIEW -->
+  <section class="glass-card" id="landingpage-generator-card" style="display: none; flex-direction: column; gap: 1.5rem; padding: 2rem; margin: 2rem;">
+    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 1rem;">
+      <div>
+        <h2 style="font-size: 1.5rem; color: #ec4899; display: flex; align-items: center; gap: 0.5rem; margin: 0 0 0.25rem 0;">
+          <i data-lucide="layout" style="width: 24px; height: 24px;"></i> KI Landingpage-Generator
+        </h2>
+        <p style="color: var(--text-muted); font-size: 0.9rem; margin: 0;">
+          Generiere hochprofessionelle, responsive B2B Landingpages mit funktionierenden ROI-Rechnern, Kontaktformularen und modernem CSS/Tailwind für GitHub Pages.
+        </p>
+      </div>
+      <button class="btn btn-outline" id="btn-back-from-landingpage" style="width: auto; gap: 0.25rem; display: flex; align-items: center;">
+        <i data-lucide="arrow-left" style="width: 16px; height: 16px;"></i> Zurück
+      </button>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 350px 1fr; gap: 1.5rem; flex: 1;">
+      <!-- Parameter / Prompt column -->
+      <div style="display: flex; flex-direction: column; gap: 1rem; border-right: 1px solid var(--border-color); padding-right: 1.5rem; text-align: left;">
+        <h3 style="font-size: 1.1rem; color: var(--text-main); margin-bottom: 0.5rem; font-weight: 600;">Landingpage-Parameter</h3>
+        
+        <div class="form-group">
+          <label style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 0.25rem;">Zielbranche / Zielgruppe</label>
+          <input type="text" id="landingpage-industry" class="form-input" style="font-size: 0.85rem;" placeholder="z. B. Wiener Büros & Kanzleien">
+        </div>
+
+        <div class="form-group">
+          <label style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 0.25rem;">Produkt / B2B-Lösung</label>
+          <input type="text" id="landingpage-product" class="form-input" style="font-size: 0.85rem;" placeholder="z. B. Premium Kaffeemaschinen-Abonnement">
+        </div>
+
+        <div class="form-group">
+          <label style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 0.25rem;">Individuelle Anforderungen / Prompts</label>
+          <textarea id="landingpage-prompt" class="form-input" style="font-size: 0.85rem; height: 120px; resize: none;" placeholder="Beschreibe Details: z. B. 'Füge einen ROI-Rechner für Kaffeekosten hinzu und ein funktionierendes B2B-Kontaktformular...'"></textarea>
+        </div>
+
+        <button type="button" class="btn btn-primary" id="btn-generate-landingpage" style="margin-top: 1rem; background: #ec4899; border-color: #ec4899; color: #fff;">
+          <i data-lucide="layout-template"></i> Landingpage generieren
+        </button>
+
+        <div style="margin-top: auto; padding: 0.75rem; background: rgba(255,255,255,0.01); border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.75rem; color: var(--text-dim); line-height: 1.4;">
+          <strong>Tipp für GitHub Pages:</strong> Die generierte Datei kann direkt als <code>index.html</code> in dein GitHub-Repository hochgeladen werden, um eine kostenlose Live-Website aufzubauen!
+        </div>
+      </div>
+
+      <!-- Live Preview / Code column -->
+      <div style="display: flex; flex-direction: column; gap: 1rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <!-- Tabs: Vorschau / Code -->
+          <div style="display: flex; gap: 0.5rem; background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); padding: 0.25rem; border-radius: 8px;">
+            <button class="btn btn-sm btn-outline active" id="btn-landingpage-preview-tab" style="border: none; padding: 0.4rem 1rem; width: auto; font-size: 0.8rem;">
+              <i data-lucide="eye" style="width: 14px; height: 14px;"></i> Live-Vorschau
+            </button>
+            <button class="btn btn-sm btn-outline" id="btn-landingpage-code-tab" style="border: none; padding: 0.4rem 1rem; width: auto; font-size: 0.8rem;">
+              <i data-lucide="code-2" style="width: 14px; height: 14px;"></i> HTML-Quellcode
+            </button>
+          </div>
+
+          <!-- Actions -->
+          <div style="display: flex; gap: 0.5rem;">
+            <button class="btn btn-sm btn-outline" id="btn-landingpage-copy-code" style="width: auto; gap: 0.25rem; display: flex; align-items: center; font-size: 0.8rem;">
+              <i data-lucide="copy" style="width: 14px; height: 14px;"></i> Code kopieren
+            </button>
+            <button class="btn class-btn btn-sm btn-outline" id="btn-landingpage-download-html" style="width: auto; gap: 0.25rem; display: flex; align-items: center; font-size: 0.8rem; border-color: var(--color-success); color: var(--color-success);">
+              <i data-lucide="download" style="width: 14px; height: 14px;"></i> HTML herunterladen (GitHub Ready)
+            </button>
+          </div>
+        </div>
+
+        <!-- Preview content container -->
+        <div style="flex: 1; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; background: #fff; min-height: 500px; display: flex; flex-direction: column;">
+          <!-- Loading Indicator overlay -->
+          <div id="landingpage-loading" style="display: none; flex-direction: column; align-items: center; justify-content: center; height: 100%; background: var(--bg-dark); gap: 1rem; flex: 1;">
+            <div class="loader" style="border-top-color: #ec4899;"></div>
+            <p style="color: var(--text-main); font-weight: 500; font-size: 0.95rem; margin: 0;">Landingpage wird von der KI entworfen...</p>
+            <p style="color: var(--text-dim); font-size: 0.8rem; margin: 0;">Wir generieren Premium-Layout, ROI-Rechner und responsive Scripte.</p>
+          </div>
+
+          <!-- iFrame Preview -->
+          <iframe id="landingpage-preview-frame" style="width: 100%; height: 100%; border: none; flex: 1; display: block;" sandbox="allow-scripts allow-popups allow-forms"></iframe>
+
+          <!-- Code View text-area -->
+          <textarea id="landingpage-code-area" readonly style="width: 100%; height: 100%; border: none; flex: 1; display: none; background: #0e121e; color: #34d399; font-family: monospace; font-size: 0.85rem; padding: 1.5rem; resize: none; outline: none; box-sizing: border-box;"></textarea>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- App JavaScript files -->
+  <script src="data.js"></script>
+  <script type="module" src="bootstrap.js"></script>
+</body>
+</html>
