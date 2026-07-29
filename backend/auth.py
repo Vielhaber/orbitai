@@ -13,11 +13,12 @@ knowing which tenant it's acting on behalf of.
 """
 
 import logging
-import traceback
 from dataclasses import dataclass
 
+import httpx
 from fastapi import Header, HTTPException
 
+import config
 import db
 
 logger = logging.getLogger("uvicorn.error")
@@ -29,6 +30,25 @@ class AuthContext:
     tenant_id: str
 
 
+async def _verify_token(token: str) -> dict:
+    """Verifies a Supabase access token via a direct REST call to GoTrue's
+    /auth/v1/user endpoint, rather than through the supabase-py SDK's
+    auth.get_user(). The SDK's bundled gotrue-py client (as of supabase-py
+    2.7.4) mishandles Supabase's newer non-JWT `sb_publishable_...` key
+    format - it ends up sending it where a real JWT is expected and the
+    request is rejected with "Invalid API key", even though the exact same
+    key/token pair works fine as a plain REST call. Calling the endpoint
+    directly sidesteps that SDK bug entirely.
+    """
+    url = f"{config.SUPABASE_URL}/auth/v1/user"
+    headers = {"apikey": config.SUPABASE_ANON_KEY, "Authorization": f"Bearer {token}"}
+    async with httpx.AsyncClient(timeout=10) as client:
+        resp = await client.get(url, headers=headers)
+    if resp.status_code != 200:
+        raise HTTPException(status_code=401, detail="Ungültiges oder abgelaufenes Zugriffstoken.")
+    return resp.json()
+
+
 async def get_auth_context(authorization: str | None = Header(default=None)) -> AuthContext:
     if not authorization or not authorization.lower().startswith("bearer "):
         raise HTTPException(status_code=401, detail="Fehlender oder ungültiger Authorization-Header.")
@@ -37,21 +57,16 @@ async def get_auth_context(authorization: str | None = Header(default=None)) -> 
     if not token:
         raise HTTPException(status_code=401, detail="Fehlendes Zugriffstoken.")
 
-    try:
-        user_response = db.anon_client().auth.get_user(token)
-    except Exception as exc:
-        logger.error("auth.get_user failed: %s\n%s", exc, traceback.format_exc())
-        raise HTTPException(status_code=401, detail=f"Ungültiges oder abgelaufenes Zugriffstoken. ({exc})")
-
-    user = getattr(user_response, "user", None)
-    if not user:
+    user = await _verify_token(token)
+    user_id = user.get("id")
+    if not user_id:
         raise HTTPException(status_code=401, detail="Ungültiges oder abgelaufenes Zugriffstoken.")
 
     membership = (
         db.service_client()
         .table("tenant_members")
         .select("tenant_id")
-        .eq("user_id", user.id)
+        .eq("user_id", user_id)
         .limit(1)
         .execute()
     )
@@ -61,4 +76,4 @@ async def get_auth_context(authorization: str | None = Header(default=None)) -> 
         # for every new user - but fail closed rather than guessing.
         raise HTTPException(status_code=403, detail="Kein Mandant für diesen Nutzer gefunden.")
 
-    return AuthContext(user_id=user.id, tenant_id=rows[0]["tenant_id"])
+    return AuthContext(user_id=user_id, tenant_id=rows[0]["tenant_id"])
