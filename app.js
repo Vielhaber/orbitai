@@ -402,6 +402,19 @@ function init() {
     }
   })();
 
+  // Wandelt "#f59e0b" in "245, 158, 11" um, damit rgba(var(--accent-rgb), x)
+  // in CSS funktioniert. Gibt null zurück, wenn der Wert kein gültiger Hex-Code ist.
+  function hexToRgbString(hex) {
+    if (typeof hex !== "string") return null;
+    const match = hex.trim().match(/^#?([0-9a-fA-F]{6})$/);
+    if (!match) return null;
+    const int = parseInt(match[1], 16);
+    const r = (int >> 16) & 255;
+    const g = (int >> 8) & 255;
+    const b = int & 255;
+    return `${r}, ${g}, ${b}`;
+  }
+
   function applyAppBranding() {
     const appName = localStorage.getItem("sales_app_name") || "OrbitAI Sales";
     const appColor = localStorage.getItem("sales_app_color") || "#00f2fe";
@@ -424,9 +437,14 @@ function init() {
       headerTitleElement.innerText = appName + " & B2B Enablement Cockpit";
     }
 
-    // 3. Farbthema anwenden
+    // 3. Farbthema anwenden (inkl. RGB-Kanal für halbtransparente Glass-Hintergründe,
+    //    z. B. bei KI Lead-Scout und KI-Werkzeuge)
     document.documentElement.style.setProperty('--accent-cyan', appColor);
     document.documentElement.style.setProperty('--accent-blue', appColor);
+    const accentRgb = hexToRgbString(appColor);
+    if (accentRgb) {
+      document.documentElement.style.setProperty('--accent-rgb', accentRgb);
+    }
 
     // 4. API-Key Box verbergen
     const apiKeyCard = document.getElementById("api-key-card");

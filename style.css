@@ -10,6 +10,7 @@
   
   /* Brand Palette */
   --accent-cyan: #00f2fe;
+  --accent-rgb: 0, 242, 254;
   --accent-violet: #8a2be2;
   --accent-blue: #4facfe;
   --text-main: #f3f4f6;
@@ -402,10 +403,10 @@ select.form-input option {
 
 /* Glass Buttons for Lead Finder (Header & Welcome Card) */
 .btn-glass-scout {
-  background: rgba(0, 242, 254, 0.08) !important;
+  background: rgba(var(--accent-rgb), 0.08) !important;
   backdrop-filter: blur(10px) !important;
   -webkit-backdrop-filter: blur(10px) !important;
-  border: 1px solid rgba(0, 242, 254, 0.3) !important;
+  border: 1px solid rgba(var(--accent-rgb), 0.3) !important;
   color: var(--accent-cyan) !important;
   font-weight: 600 !important;
   text-transform: uppercase !important;
@@ -413,7 +414,7 @@ select.form-input option {
   font-size: 0.75rem !important;
   padding: 0.65rem 1.45rem !important;
   border-radius: 8px !important;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2), 0 0 10px rgba(0, 242, 254, 0.05) !important;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2), 0 0 10px rgba(var(--accent-rgb), 0.05) !important;
   transition: all 0.3s ease !important;
   gap: 0.5rem !important;
   display: inline-flex !important;
@@ -424,9 +425,9 @@ select.form-input option {
 }
 
 .btn-glass-scout:hover {
-  background: rgba(0, 242, 254, 0.18) !important;
+  background: rgba(var(--accent-rgb), 0.18) !important;
   border-color: var(--accent-cyan) !important;
-  box-shadow: 0 4px 20px rgba(0, 242, 254, 0.25), inset 0 0 8px rgba(0, 242, 254, 0.1) !important;
+  box-shadow: 0 4px 20px rgba(var(--accent-rgb), 0.25), inset 0 0 8px rgba(var(--accent-rgb), 0.1) !important;
   color: #fff !important;
   transform: translateY(-1px) !important;
 }
@@ -472,11 +473,11 @@ select.form-input option {
 }
 
 .btn-glass-tools {
-  background: rgba(245, 158, 11, 0.08) !important;
+  background: rgba(var(--accent-rgb), 0.08) !important;
   backdrop-filter: blur(10px) !important;
   -webkit-backdrop-filter: blur(10px) !important;
-  border: 1px solid rgba(245, 158, 11, 0.3) !important;
-  color: #f59e0b !important;
+  border: 1px solid rgba(var(--accent-rgb), 0.3) !important;
+  color: var(--accent-cyan) !important;
   font-weight: 600 !important;
   text-transform: uppercase !important;
   letter-spacing: 0.06em !important;
@@ -493,9 +494,9 @@ select.form-input option {
 }
 
 .btn-glass-tools:hover {
-  background: rgba(245, 158, 11, 0.18) !important;
-  border-color: #f59e0b !important;
-  box-shadow: 0 4px 20px rgba(245, 158, 11, 0.25), inset 0 0 8px rgba(245, 158, 11, 0.1) !important;
+  background: rgba(var(--accent-rgb), 0.18) !important;
+  border-color: var(--accent-cyan) !important;
+  box-shadow: 0 4px 20px rgba(var(--accent-rgb), 0.25), inset 0 0 8px rgba(var(--accent-rgb), 0.1) !important;
   color: #fff !important;
   transform: translateY(-1px) !important;
 }
@@ -527,9 +528,9 @@ select.form-input option {
 }
 
 .ai-tool-nav-btn.active {
-  background: rgba(245, 158, 11, 0.1);
-  border-color: rgba(245, 158, 11, 0.3);
-  color: #f59e0b;
+  background: rgba(var(--accent-rgb), 0.1);
+  border-color: rgba(var(--accent-rgb), 0.3);
+  color: var(--accent-cyan);
 }
 
 /* Buttons */
