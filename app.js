@@ -20,12 +20,18 @@ import {
   apiSaveConfig,
   apiListModels,
   apiGenerate,
+  apiGenerateImage,
   apiScrape,
   parseGeminiResponse,
   buildStrategistPrompt,
   buildLeadFinderPrompt,
   buildChatPrompt,
   buildLandingPagePrompt,
+  buildReklamationPrompt,
+  buildProduktlistingPrompt,
+  buildSocialKampagnePrompt,
+  buildTrendRadarPrompt,
+  buildSocialContentPrompt,
   extractHtmlFromResponse,
   generateLocalMockData,
   generateLocalMockLeads,
@@ -161,6 +167,11 @@ function init() {
   const landingpageLoading = document.getElementById("landingpage-loading");
   const landingpagePreviewFrame = document.getElementById("landingpage-preview-frame");
   const landingpageCodeArea = document.getElementById("landingpage-code-area");
+
+  // KI-Werkzeuge DOM Elements
+  const btnHeaderAiTools = document.getElementById("btn-header-ai-tools");
+  const aiToolsCard = document.getElementById("ai-tools-card");
+  const btnBackFromAiTools = document.getElementById("btn-back-from-ai-tools");
 
   // Global State
   let currentEmails = [];
@@ -432,6 +443,7 @@ function init() {
       if (leadFinderCardMain) leadFinderCardMain.style.display = "none";
       if (settingsCard) settingsCard.style.display = "none";
       if (landingpageCard) landingpageCard.style.display = "none";
+      if (aiToolsCard) aiToolsCard.style.display = "none";
 
       if (currentCampaignData) {
         if (reportContainer) reportContainer.style.display = "flex";
@@ -1624,6 +1636,7 @@ function init() {
       if (reportContainer) reportContainer.style.display = "none";
       if (settingsCard) settingsCard.style.display = "none";
       if (landingpageCard) landingpageCard.style.display = "none";
+      if (aiToolsCard) aiToolsCard.style.display = "none";
       if (leadFinderCardMain) leadFinderCardMain.style.display = "flex";
     }
   }
@@ -1770,6 +1783,7 @@ function init() {
         if (reportContainer) reportContainer.style.display = "none";
         if (leadFinderCardMain) leadFinderCardMain.style.display = "none";
         if (landingpageCard) landingpageCard.style.display = "none";
+      if (aiToolsCard) aiToolsCard.style.display = "none";
         if (errorCard) errorCard.style.display = "none";
 
         if (settingsCard) {
@@ -2406,6 +2420,7 @@ function init() {
   if (btnBackFromLandingpage) {
     btnBackFromLandingpage.addEventListener("click", () => {
       if (landingpageCard) landingpageCard.style.display = "none";
+      if (aiToolsCard) aiToolsCard.style.display = "none";
       if (currentCampaignData) {
         if (reportContainer) reportContainer.style.display = "flex";
       } else {
@@ -2514,6 +2529,230 @@ function init() {
           if (landingpageCodeArea) landingpageCodeArea.style.display = "block";
         }
         btnGenerateLandingpage.disabled = false;
+      }
+    });
+  }
+
+  // --- KI-WERKZEUGE CORE ORCHESTRATION ---
+
+  if (btnHeaderAiTools) {
+    btnHeaderAiTools.addEventListener("click", () => {
+      if (aiToolsCard && aiToolsCard.style.display === "flex") {
+        aiToolsCard.style.display = "none";
+        if (currentCampaignData) {
+          if (reportContainer) reportContainer.style.display = "flex";
+        } else {
+          if (welcomeCard) welcomeCard.style.display = "flex";
+        }
+      } else {
+        if (welcomeCard) welcomeCard.style.display = "none";
+        if (reportContainer) reportContainer.style.display = "none";
+        if (leadFinderCardMain) leadFinderCardMain.style.display = "none";
+        if (settingsCard) settingsCard.style.display = "none";
+        if (errorCard) errorCard.style.display = "none";
+        if (landingpageCard) landingpageCard.style.display = "none";
+
+        if (aiToolsCard) aiToolsCard.style.display = "flex";
+      }
+    });
+  }
+
+  if (btnBackFromAiTools) {
+    btnBackFromAiTools.addEventListener("click", () => {
+      if (aiToolsCard) aiToolsCard.style.display = "none";
+      if (currentCampaignData) {
+        if (reportContainer) reportContainer.style.display = "flex";
+      } else {
+        if (welcomeCard) welcomeCard.style.display = "flex";
+      }
+    });
+  }
+
+  // Tool-Umschalter (nur eines der 5 Panels sichtbar)
+  const aiToolNavButtons = [
+    { btn: document.getElementById("btn-tool-reklamation"), panel: document.getElementById("tool-panel-reklamation") },
+    { btn: document.getElementById("btn-tool-produktlisting"), panel: document.getElementById("tool-panel-produktlisting") },
+    { btn: document.getElementById("btn-tool-social-kampagne"), panel: document.getElementById("tool-panel-social-kampagne") },
+    { btn: document.getElementById("btn-tool-trend-radar"), panel: document.getElementById("tool-panel-trend-radar") },
+    { btn: document.getElementById("btn-tool-social-content"), panel: document.getElementById("tool-panel-social-content") },
+  ];
+  aiToolNavButtons.forEach(({ btn, panel }) => {
+    if (!btn) return;
+    btn.addEventListener("click", () => {
+      aiToolNavButtons.forEach(({ btn: b, panel: p }) => {
+        if (b) b.classList.toggle("active", b === btn);
+        if (p) p.style.display = p === panel ? "flex" : "none";
+      });
+    });
+  });
+
+  /**
+   * Shared helper for the 4 pure-text KI-Werkzeuge (Reklamationen,
+   * Produktlistungen, Social-Kampagnen, Trend-Radar): all follow the exact
+   * same shape (gather inputs -> build prompt -> apiGenerate -> show text in
+   * a readonly textarea + copy button), so one function drives all four
+   * instead of copy-pasting the same click handler four times.
+   */
+  function wireAiTextTool({ buttonId, loadingId, outputId, copyId, buildPrompt }) {
+    const btn = document.getElementById(buttonId);
+    const loading = document.getElementById(loadingId);
+    const output = document.getElementById(outputId);
+    const copyBtn = document.getElementById(copyId);
+    if (!btn) return;
+
+    btn.addEventListener("click", async () => {
+      if (!apiKeyConfigured) {
+        alert("Bitte zuerst in den Einstellungen einen Gemini API-Key hinterlegen, um KI-Werkzeuge zu nutzen.");
+        return;
+      }
+
+      if (loading) loading.style.display = "flex";
+      if (output) output.style.display = "none";
+      if (copyBtn) copyBtn.style.display = "none";
+      btn.disabled = true;
+
+      try {
+        const prompt = buildPrompt();
+        const selectedModel = modelSelect ? modelSelect.value : "gemini-2.5-flash";
+        const text = await apiGenerate(prompt, selectedModel);
+        if (output) {
+          output.value = text;
+          output.style.display = "block";
+        }
+        if (copyBtn) copyBtn.style.display = "inline-flex";
+      } catch (err) {
+        console.error(`KI-Werkzeug (${buttonId}) fehlgeschlagen:`, err);
+        alert("Generierung fehlgeschlagen: " + err.message);
+      } finally {
+        if (loading) loading.style.display = "none";
+        btn.disabled = false;
+      }
+    });
+
+    if (copyBtn) {
+      copyBtn.addEventListener("click", () => {
+        if (output && output.value) {
+          navigator.clipboard.writeText(output.value)
+            .then(() => alert("In die Zwischenablage kopiert!"))
+            .catch((err) => alert("Kopieren fehlgeschlagen: " + err));
+        }
+      });
+    }
+  }
+
+  wireAiTextTool({
+    buttonId: "btn-generate-reklamation",
+    loadingId: "reklamation-loading",
+    outputId: "reklamation-output",
+    copyId: "btn-copy-reklamation",
+    buildPrompt: () => {
+      const text = document.getElementById("reklamation-input").value.trim();
+      const firma = document.getElementById("reklamation-firma").value.trim();
+      if (!text) throw new Error("Bitte zuerst den Beschwerdetext einfügen.");
+      return buildReklamationPrompt(text, firma, "");
+    },
+  });
+
+  wireAiTextTool({
+    buttonId: "btn-generate-produktlisting",
+    loadingId: "produktlisting-loading",
+    outputId: "produktlisting-output",
+    copyId: "btn-copy-produktlisting",
+    buildPrompt: () => {
+      const name = document.getElementById("produktlisting-name").value.trim();
+      const stichpunkte = document.getElementById("produktlisting-stichpunkte").value.trim();
+      const plattform = document.getElementById("produktlisting-plattform").value.trim();
+      if (!name || !stichpunkte) throw new Error("Bitte Produktname und Stichpunkte ausfüllen.");
+      return buildProduktlistingPrompt(name, stichpunkte, plattform);
+    },
+  });
+
+  wireAiTextTool({
+    buttonId: "btn-generate-social-kampagne",
+    loadingId: "social-kampagne-loading",
+    outputId: "social-kampagne-output",
+    copyId: "btn-copy-social-kampagne",
+    buildPrompt: () => {
+      const produkt = document.getElementById("social-kampagne-produkt").value.trim();
+      const zielgruppe = document.getElementById("social-kampagne-zielgruppe").value.trim();
+      const plattform = document.getElementById("social-kampagne-plattform").value;
+      if (!produkt || !zielgruppe) throw new Error("Bitte Produkt und Zielgruppe ausfüllen.");
+      return buildSocialKampagnePrompt(produkt, zielgruppe, plattform);
+    },
+  });
+
+  wireAiTextTool({
+    buttonId: "btn-generate-trend-radar",
+    loadingId: "trend-radar-loading",
+    outputId: "trend-radar-output",
+    copyId: "btn-copy-trend-radar",
+    buildPrompt: () => {
+      const branche = document.getElementById("trend-radar-branche").value.trim();
+      if (!branche) throw new Error("Bitte eine Branche/Nische angeben.");
+      return buildTrendRadarPrompt(branche);
+    },
+  });
+
+  wireAiTextTool({
+    buttonId: "btn-generate-social-content",
+    loadingId: "social-content-loading",
+    outputId: "social-content-output",
+    copyId: "btn-copy-social-content",
+    buildPrompt: () => {
+      const thema = document.getElementById("social-content-thema").value.trim();
+      const plattform = document.getElementById("social-content-plattform").value;
+      if (!thema) throw new Error("Bitte ein Thema/Anlass angeben.");
+      return buildSocialContentPrompt(thema, plattform);
+    },
+  });
+
+  // Social-Content: Grafik-Generierung (separater Button, eigener Endpunkt,
+  // da Bildgenerierung ein anderes Gemini-Modell nutzt als reiner Text und
+  // nicht für jeden API-Key freigeschaltet ist).
+  const btnGenerateSocialImage = document.getElementById("btn-generate-social-image");
+  const socialImageLoading = document.getElementById("social-image-loading");
+  const socialContentImage = document.getElementById("social-content-image");
+  const btnDownloadSocialImage = document.getElementById("btn-download-social-image");
+
+  if (btnGenerateSocialImage) {
+    btnGenerateSocialImage.addEventListener("click", async () => {
+      if (!apiKeyConfigured) {
+        alert("Bitte zuerst in den Einstellungen einen Gemini API-Key hinterlegen, um KI-Werkzeuge zu nutzen.");
+        return;
+      }
+
+      const thema = document.getElementById("social-content-thema").value.trim();
+      const plattform = document.getElementById("social-content-plattform").value;
+      if (!thema) {
+        alert("Bitte ein Thema/Anlass angeben.");
+        return;
+      }
+
+      if (socialImageLoading) socialImageLoading.style.display = "flex";
+      if (socialContentImage) socialContentImage.style.display = "none";
+      if (btnDownloadSocialImage) btnDownloadSocialImage.style.display = "none";
+      btnGenerateSocialImage.disabled = true;
+
+      try {
+        const imagePrompt = `Erstelle eine hochwertige Social-Media-Grafik für einen ${plattform}-Post zum Thema "${thema}". Modernes B2B-Design, professionell, klare Bildsprache, keine Textelemente/Schrift im Bild.`;
+        const dataUrl = await apiGenerateImage(imagePrompt);
+        if (socialContentImage) {
+          socialContentImage.src = dataUrl;
+          socialContentImage.style.display = "block";
+        }
+        if (btnDownloadSocialImage) {
+          btnDownloadSocialImage.href = dataUrl;
+          btnDownloadSocialImage.style.display = "inline-flex";
+        }
+      } catch (err) {
+        console.error("Social-Grafik-Gen fehlgeschlagen:", err);
+        alert(
+          "Grafik-Generierung fehlgeschlagen: " + err.message +
+          "\n\nHinweis: Bild-Generierung ist nicht für jeden Gemini-API-Key freigeschaltet. Nutze in dem Fall das Bild-Briefing aus dem generierten Text für einen Grafiker oder ein anderes Tool."
+        );
+      } finally {
+        if (socialImageLoading) socialImageLoading.style.display = "none";
+        btnGenerateSocialImage.disabled = false;
       }
     });
   }

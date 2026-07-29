@@ -471,6 +471,67 @@ select.form-input option {
   transform: translateY(1px) !important;
 }
 
+.btn-glass-tools {
+  background: rgba(245, 158, 11, 0.08) !important;
+  backdrop-filter: blur(10px) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+  border: 1px solid rgba(245, 158, 11, 0.3) !important;
+  color: #f59e0b !important;
+  font-weight: 600 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.06em !important;
+  font-size: 0.75rem !important;
+  padding: 0.6rem 1rem !important;
+  border-radius: 8px !important;
+  transition: all 0.2s ease !important;
+  gap: 0.5rem !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: auto !important;
+  cursor: pointer !important;
+}
+
+.btn-glass-tools:hover {
+  background: rgba(245, 158, 11, 0.18) !important;
+  border-color: #f59e0b !important;
+  box-shadow: 0 4px 20px rgba(245, 158, 11, 0.25), inset 0 0 8px rgba(245, 158, 11, 0.1) !important;
+  color: #fff !important;
+  transform: translateY(-1px) !important;
+}
+
+.btn-glass-tools:active {
+  transform: translateY(1px) !important;
+}
+
+.ai-tool-nav-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  text-align: left;
+  padding: 0.75rem 0.9rem;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.ai-tool-nav-btn:hover {
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-main);
+}
+
+.ai-tool-nav-btn.active {
+  background: rgba(245, 158, 11, 0.1);
+  border-color: rgba(245, 158, 11, 0.3);
+  color: #f59e0b;
+}
+
 /* Buttons */
 .btn {
   display: inline-flex;

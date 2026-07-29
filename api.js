@@ -95,6 +95,24 @@ export async function apiScrape(url) {
 }
 
 /**
+ * Generates a single image via the backend's Gemini image proxy and returns
+ * a ready-to-use data: URL. Note: image generation is not enabled for every
+ * Gemini API key/account tier, so callers should show `err.message` to the
+ * user rather than assuming this always succeeds.
+ */
+export async function apiGenerateImage(prompt) {
+  const res = await authFetch("/api/generate-image", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ prompt }),
+  });
+  const data = await readJsonSafe(res);
+  if (!res.ok) throw new Error(data.detail || data.error || `HTTP-Fehler ${res.status}`);
+  if (!data.imageBase64) throw new Error("Ungültige Antwort von der Gemini API erhalten.");
+  return `data:image/png;base64,${data.imageBase64}`;
+}
+
+/**
  * Parses the Gemini response using the custom module markers
  */
 export function parseGeminiResponse(rawText) {
@@ -353,6 +371,157 @@ Falls der Nutzer eine Systemaktion wünscht, füge am Ende deiner Textantwort EX
 - [SYSTEM_COMMAND: generate_landingpage("Produkt", "Branche", "Zusatzanforderungen")] -> Um direkt eine Landingpage zu entwerfen.
 
 Beantworte seine Frage, hilf ihm bei Ergänzungen oder erstelle auf Wunsch neue E-Mails oder Gegenargumente. Antworte in strukturierter Markdown-Form, halte dich kurz, präzise und lösungsorientiert.
+`;
+}
+
+// --------------------------------------------------------------------------
+// KI-Werkzeuge: Reklamationen, Produktlistungen, Social-Media-Kampagnen,
+// Trend-Radar, Social-Media-Content. Alle nutzen den bestehenden
+// /api/generate-Proxy (reiner Text-Prompt rein, Text raus) - kein separater
+// Backend-Code nötig, nur ein spezialisierter Prompt pro Werkzeug.
+// --------------------------------------------------------------------------
+
+/** Reklamationen-Assistent: kategorisiert eine Kundenbeschwerde und formuliert eine Antwort. */
+export function buildReklamationPrompt(beschwerdetext, firmenname, ton) {
+  const toneText = ton || "professionell, empathisch und lösungsorientiert";
+  return `
+Du bist ein erfahrener Kundenservice-Experte für B2B-Unternehmen. Ein Kunde hat folgende Reklamation/Beschwerde eingereicht:
+
+"${beschwerdetext}"
+
+${firmenname ? `Das antwortende Unternehmen heißt: "${firmenname}".` : ""}
+
+Bearbeite diese Reklamation in genau diesem Format:
+
+===EINSTUFUNG===
+DRINGLICHKEIT: [Hoch/Mittel/Niedrig]
+THEMA: [Kurze Kategorie, z.B. Lieferverzug, Produktmangel, Abrechnungsfehler]
+ZUSAMMENFASSUNG: [1-2 Sätze, was der Kunde eigentlich möchte]
+
+===ANTWORTENTWURF===
+[Vollständige, versandfertige Antwort-E-Mail an den Kunden. Ton: ${toneText}. Nimm die Beschwerde ernst, biete eine konkrete Lösung oder nächste Schritte an, keine Floskeln.]
+
+===INTERNE-NOTIZ===
+[Kurzer interner Hinweis für das Team: was sollte intern als nächstes passieren?]
+
+Schreibe auf Deutsch. Gib ausschließlich diesen strukturierten Text zurück, keine zusätzlichen Erklärungen davor oder danach.
+`;
+}
+
+/** Produktlistungen-Generator: macht aus Stichpunkten fertige Verkaufstexte. */
+export function buildProduktlistingPrompt(produktname, stichpunkte, plattform) {
+  return `
+Du bist ein E-Commerce-Copywriter, spezialisiert auf konversionsstarke Produktlistings.
+
+Produktname: "${produktname}"
+Stichpunkte / Rohdaten zum Produkt: "${stichpunkte}"
+${plattform ? `Zielplattform: "${plattform}" (passe Tonalität und Länge an diese Plattform an).` : ""}
+
+Erstelle daraus ein vollständiges Produktlisting in genau diesem Format:
+
+===TITEL===
+[Prägnanter, SEO-starker Produkttitel, max. 80 Zeichen]
+
+===KURZBESCHREIBUNG===
+[2-3 Sätze, die den Kernnutzen auf den Punkt bringen]
+
+===BULLET-POINTS===
+* [Vorteil/Feature 1]
+* [Vorteil/Feature 2]
+* [Vorteil/Feature 3]
+* [Vorteil/Feature 4]
+* [Vorteil/Feature 5]
+
+===LANGBESCHREIBUNG===
+[3-4 Absätze ausführliche Produktbeschreibung mit Nutzenargumentation]
+
+===SEO-KEYWORDS===
+[5-8 relevante Suchbegriffe, kommagetrennt]
+
+Schreibe auf Deutsch. Gib ausschließlich diesen strukturierten Text zurück, keine zusätzlichen Erklärungen davor oder danach.
+`;
+}
+
+/** Social-Media-Kampagnen-Generator: Text- und Targeting-Vorschläge (keine echten Ads-Schaltungen). */
+export function buildSocialKampagnePrompt(produkt, zielgruppe, plattform) {
+  const cleanPlattform = plattform || "LinkedIn";
+  return `
+Du bist ein Social-Media-Ads-Stratege für B2B-Lead-Kampagnen.
+
+Produkt/Dienstleistung: "${produkt}"
+Zielgruppe: "${zielgruppe}"
+Plattform: "${cleanPlattform}"
+
+Erstelle einen kompletten Kampagnen-Entwurf in genau diesem Format:
+
+===KAMPAGNENZIEL===
+[Empfohlenes Kampagnenziel für ${cleanPlattform}, z.B. Lead-Generierung, Traffic]
+
+===TARGETING-VORSCHLAG===
+[Konkrete Vorschläge für Zielgruppen-Targeting: Berufsbezeichnungen, Branchen, Unternehmensgröße, Interessen - passend zu "${zielgruppe}"]
+
+===AD-COPY-VARIANTE-1===
+HEADLINE: [Kurzer Aufhänger]
+TEXT: [Anzeigentext, 2-3 Sätze]
+CTA: [Call-to-Action-Button-Text]
+
+===AD-COPY-VARIANTE-2===
+HEADLINE: [Alternativer Aufhänger, anderer Winkel]
+TEXT: [Anzeigentext, 2-3 Sätze]
+CTA: [Call-to-Action-Button-Text]
+
+===BUDGET-HINWEIS===
+[Kurze, allgemeine Einschätzung zu Teststart-Budget und Laufzeit - keine konkreten Geldbeträge versprechen, nur eine Testlaufzeit-Empfehlung]
+
+Schreibe auf Deutsch. Gib ausschließlich diesen strukturierten Text zurück, keine zusätzlichen Erklärungen davor oder danach.
+`;
+}
+
+/** Trend-Radar (on-demand): Bewusst manuell ausgelöst - echte Automatisierung + Push braucht eigene Infrastruktur (siehe UI-Hinweis). */
+export function buildTrendRadarPrompt(branche) {
+  return `
+Du bist ein Marktanalyst mit Fokus auf B2B-Trends. Das aktuelle Kalenderjahr ist 2026, alle Aussagen müssen auf dem Stand von 2026 sein.
+
+Branche/Nische: "${branche}"
+
+Erstelle einen kompakten Trend-Report in genau diesem Format:
+
+===TOP-TRENDS===
+1. [Trend-Name]: [1-2 Sätze Erklärung, warum das gerade relevant ist]
+2. [Trend-Name]: [Erklärung]
+3. [Trend-Name]: [Erklärung]
+
+===CHANCEN-FUER-VERTRIEB===
+[2-3 Sätze: wie ein B2B-Vertriebsteam diese Trends konkret für Akquise nutzen kann]
+
+===RISIKEN===
+[1-2 Sätze: worauf man in dieser Branche aktuell achten sollte]
+
+Schreibe auf Deutsch. Gib ausschließlich diesen strukturierten Text zurück, keine zusätzlichen Erklärungen davor oder danach.
+`;
+}
+
+/** Social-Media-Content: Text/Caption-Teil. Bild wird separat über apiGenerateImage erzeugt. */
+export function buildSocialContentPrompt(thema, plattform) {
+  const cleanPlattform = plattform || "LinkedIn";
+  return `
+Du bist ein Social-Media-Manager für B2B-Unternehmen.
+
+Thema/Anlass des Posts: "${thema}"
+Plattform: "${cleanPlattform}"
+
+Erstelle einen fertigen Social-Media-Post in genau diesem Format:
+
+===CAPTION===
+[Fertiger Post-Text für ${cleanPlattform}, inkl. passender Tonalität für die Plattform, mit einem klaren Call-to-Action am Ende]
+
+===HASHTAGS===
+[5-8 relevante Hashtags, mit # und Leerzeichen getrennt]
+
+===BILD-BRIEFING===
+[Kurze, konkrete Bildbeschreibung für einen Grafiker/eine Bild-KI: Motiv, Stil, Farben, Stimmung]
+
+Schreibe auf Deutsch. Gib ausschließlich diesen strukturierten Text zurück, keine zusätzlichen Erklärungen davor oder danach.
 `;
 }
 
