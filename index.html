@@ -407,13 +407,56 @@
               </button>
             </div>
 
+            <!-- Eigenes Angebot: Website auslesen oder manuell eintragen, plus Historie -->
+            <div style="border: 1px solid var(--border-color); border-radius: 10px; padding: 1.25rem; margin-bottom: 1.5rem; text-align: left; background: rgba(255,255,255,0.015);">
+              <h4 style="font-size: 0.9rem; color: var(--text-main); margin: 0 0 0.25rem 0; display: flex; align-items: center; gap: 0.4rem;">
+                <i data-lucide="briefcase" style="width: 16px; height: 16px; color: var(--accent-cyan);"></i> Eigenes Angebot (optional)
+              </h4>
+              <p style="font-size: 0.75rem; color: var(--text-dim); margin: 0 0 0.75rem 0;">
+                Firmen-Website auslesen lassen oder das Angebot direkt eintragen - wird automatisch als Produktbeschreibung für die Kundensuche verwendet. Gespeicherte Angebote kannst du jederzeit wiederverwenden.
+              </p>
+
+              <div class="form-group" style="margin-bottom: 0.75rem;">
+                <label style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 0.35rem;">Gespeicherte Angebote</label>
+                <select id="finder-offer-history" class="form-input" style="font-size: 0.85rem;">
+                  <option value="">-- Gespeichertes Angebot laden --</option>
+                </select>
+              </div>
+
+              <div style="display: flex; gap: 0.5rem; margin-bottom: 0.75rem; align-items: flex-end; flex-wrap: wrap;">
+                <div class="form-group" style="flex: 1; min-width: 220px; margin-bottom: 0;">
+                  <label style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 0.35rem;">Firmen-Website</label>
+                  <div class="input-wrapper">
+                    <i data-lucide="link"></i>
+                    <input type="text" id="finder-offer-website" class="form-input" placeholder="z.B. https://meine-firma.de">
+                  </div>
+                </div>
+                <button type="button" class="btn btn-outline" id="btn-extract-offer" style="width: auto; gap: 0.4rem; white-space: nowrap;">
+                  <i data-lucide="download-cloud" style="width: 15px; height: 15px;"></i> Angebot auslesen
+                </button>
+              </div>
+
+              <div id="finder-offer-extract-loading" style="display: none; align-items: center; gap: 0.5rem; color: var(--text-muted); font-size: 0.8rem; margin-bottom: 0.75rem;">
+                <div class="loader" style="width: 16px; height: 16px; border-width: 2px;"></div> Website wird gelesen und zusammengefasst...
+              </div>
+
+              <div class="form-group" style="margin-bottom: 0.5rem;">
+                <label style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 0.35rem;">Angebotstext (wird automatisch befüllt, ist aber frei editierbar)</label>
+                <textarea id="finder-offer-text" class="form-input" style="font-size: 0.85rem; height: 90px; resize: vertical;" placeholder="z. B. Wir verkaufen Arbeitsbekleidung für Handwerksbetriebe in Österreich, Fokus auf langlebige, normkonforme Schutzkleidung..."></textarea>
+              </div>
+
+              <button type="button" class="btn btn-sm btn-outline" id="btn-save-offer" style="width: auto; gap: 0.35rem;">
+                <i data-lucide="save" style="width: 14px; height: 14px;"></i> Als neues Angebot speichern
+              </button>
+            </div>
+
             <!-- Form -->
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; text-align: left;">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1rem; text-align: left;">
               <div class="form-group">
                 <label style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 0.35rem;">Produkt / Dienstleistung / Lösung</label>
                 <div class="input-wrapper">
                   <i data-lucide="cpu"></i>
-                  <input type="text" id="finder-product-main" class="form-input" placeholder="z.B. Ladeinfrastruktur für E-Autos">
+                  <input type="text" id="finder-product-main" class="form-input" placeholder="z.B. Ladeinfrastruktur für E-Autos (oder oben ein Angebot auslesen)">
                 </div>
               </div>
               <div class="form-group">
@@ -430,6 +473,14 @@
                   <input type="text" id="finder-industry-main" class="form-input" placeholder="z.B. Luxus-Hotellerie">
                 </div>
               </div>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 1.5rem;">
+              <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; color: var(--text-muted); cursor: pointer; user-select: none;">
+                <input type="checkbox" id="finder-sort-distance" style="width: 16px; height: 16px; cursor: pointer; accent-color: var(--accent-cyan);">
+                Ergebnisse nach Entfernung von meinem Standort sortieren (fragt Browser-Standort ab)
+              </label>
+              <span id="finder-distance-status" style="font-size: 0.75rem; color: var(--text-dim);"></span>
             </div>
 
             <div style="display: flex; justify-content: flex-end;">

@@ -94,6 +94,25 @@ export async function apiScrape(url) {
   return data.text || "";
 }
 
+/**
+ * Resolves a free-text place name (city/region) to {lat, lon} via the
+ * backend's Nominatim proxy. Returns {lat: null, lon: null} if the place
+ * couldn't be resolved or the request failed - callers should treat that as
+ * "distance unknown for this one", not as a hard error.
+ */
+export async function apiGeocode(place) {
+  try {
+    const res = await authFetch(`/api/geocode?place=${encodeURIComponent(place)}`);
+    const data = await readJsonSafe(res);
+    if (!res.ok || typeof data.lat !== "number" || typeof data.lon !== "number") {
+      return { lat: null, lon: null };
+    }
+    return { lat: data.lat, lon: data.lon };
+  } catch (_) {
+    return { lat: null, lon: null };
+  }
+}
+
 /** Operator-only usage dashboard data. 403s server-side for anyone whose
  * verified e-mail doesn't match the backend's ADMIN_EMAIL env var. */
 export async function apiAdminStats() {
@@ -375,9 +394,34 @@ Erstelle ein JSON-Array, das ausschließlich passende Firmenobjekte enthält. Je
 - "potenzial": Das geschätzte Kaufpotenzial für dieses B2B-Produkt (muss exakt einer dieser drei Strings sein: "Hoch", "Mittel" oder "Gering", basierend auf Schmerzpunkt-Dringlichkeit und Branchenrelevanz)
 - "industry": Die genaue Branche des Unternehmens
 - "website": Die Website (z. B. https://www.firma.de)
+- "location": Der Ort/die Stadt, in der dieses Unternehmen tatsächlich ansässig ist (z. B. "Steyr" oder "Hamburg-Altona") - so genau wie möglich, wird für eine Entfernungsberechnung genutzt
 - "notes": Eine aussagekräftige Vertriebsnotiz, warum dieses Unternehmen das Produkt benötigt
 
 Gib AUSSCHLIESSLICH das nackte JSON-Array zurück. Schreibe keine Erklärungen davor oder danach. Verwende keine Markdown-Codeblocks (\`\`\`json).
+`;
+}
+
+/**
+ * Builds the prompt used to turn raw scraped website text (or freehand
+ * notes) into a concise "what does this company sell" summary, which is
+ * then used as the product/offer description fed into the Lead-Scout
+ * search. Keeping this as a separate prompt (rather than piping the raw
+ * scraped text straight into buildLeadFinderPrompt) keeps the actual Lead-
+ * Scout prompt short and focused even when the source website is verbose.
+ */
+export function buildOfferExtractionPrompt(scrapedText, website) {
+  return `
+Du bekommst den von einer Firmen-Website extrahierten Rohtext${website ? ` (Quelle: ${website})` : ""}. Fasse daraus in 3-5 prägnanten Sätzen zusammen, was diese Firma anbietet:
+- Welches Produkt / welche Dienstleistung wird verkauft?
+- Für welche Zielgruppe / Branche ist das Angebot gedacht?
+- Was ist das Alleinstellungsmerkmal, falls erkennbar?
+
+Schreibe auf Deutsch, sachlich, ohne Floskeln oder Werbesprache. Gib ausschließlich den Fließtext der Zusammenfassung zurück, keine Überschriften, keine Einleitung wie "Hier ist die Zusammenfassung".
+
+Website-Text:
+"""
+${(scrapedText || "").slice(0, 4000)}
+"""
 `;
 }
 
@@ -1060,6 +1104,7 @@ export function generateLocalMockLeads(product, region, industry) {
       potenzial: i % 3 === 0 ? "Hoch" : (i % 3 === 1 ? "Mittel" : "Gering"),
       industry: i % 4 === 0 ? "Dienstleistungen" : (i % 4 === 1 ? "Technologie" : (i % 4 === 2 ? "Handel" : cleanInd)),
       website: website,
+      location: regCap,
       notes: notes
     });
   }

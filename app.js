@@ -22,6 +22,7 @@ import {
   apiGenerate,
   apiGenerateImage,
   apiScrape,
+  apiGeocode,
   apiAdminStats,
   apiAdminExport,
   apiInviteMember,
@@ -29,6 +30,7 @@ import {
   parseGeminiResponse,
   buildStrategistPrompt,
   buildLeadFinderPrompt,
+  buildOfferExtractionPrompt,
   buildChatPrompt,
   buildLandingPagePrompt,
   buildReklamationPrompt,
@@ -136,6 +138,18 @@ function init() {
   const finderLoadingMain = document.getElementById("finder-loading-main");
   const finderResultsMain = document.getElementById("finder-results-main");
   const finderResultsListMain = document.getElementById("finder-results-list-main");
+
+  // Eigenes Angebot (Website auslesen/manuell) + Historie
+  const finderOfferHistory = document.getElementById("finder-offer-history");
+  const finderOfferWebsite = document.getElementById("finder-offer-website");
+  const btnExtractOffer = document.getElementById("btn-extract-offer");
+  const finderOfferExtractLoading = document.getElementById("finder-offer-extract-loading");
+  const finderOfferText = document.getElementById("finder-offer-text");
+  const btnSaveOffer = document.getElementById("btn-save-offer");
+
+  // Entfernungs-Sortierung
+  const finderSortDistance = document.getElementById("finder-sort-distance");
+  const finderDistanceStatus = document.getElementById("finder-distance-status");
 
   // Settings & Whitelabel DOM Elements
   const btnHeaderSettings = document.getElementById("btn-header-settings");
@@ -1702,17 +1716,198 @@ function init() {
     });
   }
 
+  // --- Eigenes Angebot: Website auslesen, manuell eintragen, Historie ---
+
+  function loadOffers() {
+    try {
+      return JSON.parse(localStorage.getItem("sales_offers") || "[]");
+    } catch (_) {
+      return [];
+    }
+  }
+
+  function saveOffers(offers) {
+    localStorage.setItem("sales_offers", JSON.stringify(offers));
+    syncToCloud("offers", "sales_offers", []);
+  }
+
+  function renderOfferHistoryOptions() {
+    if (!finderOfferHistory) return;
+    const offers = loadOffers();
+    const current = finderOfferHistory.value;
+    finderOfferHistory.innerHTML =
+      `<option value="">-- Gespeichertes Angebot laden --</option>` +
+      offers
+        .map((o) => `<option value="${escapeHtml(o.id)}">${escapeHtml(o.name)}</option>`)
+        .join("");
+    if (offers.some((o) => o.id === current)) finderOfferHistory.value = current;
+  }
+  renderOfferHistoryOptions();
+
+  if (finderOfferHistory) {
+    finderOfferHistory.addEventListener("change", () => {
+      const offers = loadOffers();
+      const selected = offers.find((o) => o.id === finderOfferHistory.value);
+      if (!selected) return;
+      if (finderOfferText) finderOfferText.value = selected.offerText || "";
+      if (finderOfferWebsite) finderOfferWebsite.value = selected.website || "";
+    });
+  }
+
+  if (btnExtractOffer) {
+    btnExtractOffer.addEventListener("click", async () => {
+      const website = (finderOfferWebsite.value || "").trim();
+      if (!website) {
+        alert("Bitte zuerst eine Website-URL eintragen.");
+        return;
+      }
+      if (!apiKeyConfigured) {
+        alert("Zum automatischen Auslesen wird ein hinterlegter Gemini API-Key benötigt. Du kannst das Angebot auch direkt manuell in das Textfeld darunter eintragen.");
+        return;
+      }
+      const urlWithScheme = /^https?:\/\//i.test(website) ? website : `https://${website}`;
+
+      if (finderOfferExtractLoading) finderOfferExtractLoading.style.display = "flex";
+      btnExtractOffer.disabled = true;
+      try {
+        const scrapedText = await apiScrape(urlWithScheme);
+        if (!scrapedText) {
+          alert("Die Website konnte nicht ausgelesen werden. Bitte trage das Angebot stattdessen manuell ein.");
+          return;
+        }
+        const selectedModel = modelSelect ? modelSelect.value : "";
+        const offerPrompt = buildOfferExtractionPrompt(scrapedText, urlWithScheme);
+        const summary = await apiGenerate(offerPrompt, selectedModel);
+        if (finderOfferText) finderOfferText.value = summary.trim();
+      } catch (err) {
+        console.error("Angebot auslesen fehlgeschlagen:", err);
+        alert("Angebot konnte nicht automatisch ausgelesen werden: " + (err.message || err) + "\n\nDu kannst es stattdessen manuell in das Textfeld eintragen.");
+      } finally {
+        if (finderOfferExtractLoading) finderOfferExtractLoading.style.display = "none";
+        btnExtractOffer.disabled = false;
+      }
+    });
+  }
+
+  if (btnSaveOffer) {
+    btnSaveOffer.addEventListener("click", () => {
+      const offerText = (finderOfferText.value || "").trim();
+      if (!offerText) {
+        alert("Bitte zuerst ein Angebot auslesen oder eintragen, bevor du es speicherst.");
+        return;
+      }
+      const name = prompt("Name für dieses Angebot (z. B. Firmenname oder Produktlinie):", finderOfferWebsite.value || "");
+      if (!name || !name.trim()) return;
+
+      const offers = loadOffers();
+      offers.unshift({
+        id: `offer_${Date.now()}`,
+        name: name.trim(),
+        website: (finderOfferWebsite.value || "").trim(),
+        offerText,
+        savedAt: new Date().toISOString(),
+      });
+      saveOffers(offers);
+      renderOfferHistoryOptions();
+    });
+  }
+
+  // --- Entfernung: Browser-Standort + Geocoding + Haversine ---
+
+  function haversineKm(lat1, lon1, lat2, lon2) {
+    const toRad = (deg) => (deg * Math.PI) / 180;
+    const R = 6371; // Erdradius in km
+    const dLat = toRad(lat2 - lat1);
+    const dLon = toRad(lon2 - lon1);
+    const a =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  }
+
+  function getBrowserLocation() {
+    return new Promise((resolve, reject) => {
+      if (!navigator.geolocation) {
+        reject(new Error("Dein Browser unterstützt keine Standortabfrage."));
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(
+        (pos) => resolve({ lat: pos.coords.latitude, lon: pos.coords.longitude }),
+        (err) => reject(new Error(err.message || "Standortzugriff wurde abgelehnt.")),
+        { enableHighAccuracy: false, timeout: 8000, maximumAge: 300000 }
+      );
+    });
+  }
+
+  /** Enriches leads with distanceKm (when possible) and sorts them nearest-
+   * first. Geocodes each *unique* lead location once (many leads share the
+   * same searched city/region) to stay well under Nominatim's rate limit,
+   * and fails open per-lead: a lead whose location can't be geocoded just
+   * keeps distanceKm undefined and sorts to the end, instead of breaking
+   * the whole search. */
+  async function applyDistanceSortingIfEnabled(leads, fallbackRegion) {
+    if (!finderSortDistance || !finderSortDistance.checked || !Array.isArray(leads) || leads.length === 0) {
+      return leads;
+    }
+    if (finderDistanceStatus) finderDistanceStatus.textContent = "Standort wird abgefragt...";
+
+    let userLoc;
+    try {
+      userLoc = await getBrowserLocation();
+    } catch (err) {
+      console.error("Standortabfrage fehlgeschlagen:", err);
+      if (finderDistanceStatus) {
+        finderDistanceStatus.textContent = "Standort nicht verfügbar - Sortierung übersprungen (" + err.message + ")";
+      }
+      return leads;
+    }
+
+    if (finderDistanceStatus) finderDistanceStatus.textContent = "Entfernungen werden berechnet...";
+
+    const geocodeCache = new Map();
+    for (const lead of leads) {
+      const place = (lead.location || fallbackRegion || "").trim();
+      if (!place) continue;
+      const key = place.toLowerCase();
+      if (!geocodeCache.has(key)) {
+        // Sequential (not Promise.all) to stay a polite, low-concurrency
+        // client against Nominatim's shared free API.
+        geocodeCache.set(key, await apiGeocode(place));
+      }
+      const coords = geocodeCache.get(key);
+      if (coords && typeof coords.lat === "number" && typeof coords.lon === "number") {
+        lead.distanceKm = haversineKm(userLoc.lat, userLoc.lon, coords.lat, coords.lon);
+      }
+    }
+
+    leads.sort((a, b) => {
+      const da = typeof a.distanceKm === "number" ? a.distanceKm : Infinity;
+      const db = typeof b.distanceKm === "number" ? b.distanceKm : Infinity;
+      return da - db;
+    });
+
+    if (finderDistanceStatus) {
+      const known = leads.filter((l) => typeof l.distanceKm === "number").length;
+      finderDistanceStatus.textContent = `Nach Entfernung sortiert (${known}/${leads.length} Standorte gefunden).`;
+    }
+    return leads;
+  }
+
   // Call Gemini (via backend) to search for Leads in main view
   if (btnRunFinderMain) {
     btnRunFinderMain.addEventListener("click", async () => {
-      const product = finderProductMain.value.trim();
+      const offerText = finderOfferText ? finderOfferText.value.trim() : "";
+      const product = offerText || finderProductMain.value.trim();
       const region = finderRegionMain.value.trim();
       const industry = finderIndustryMain.value.trim();
+
+      if (finderDistanceStatus) finderDistanceStatus.textContent = "";
 
       if (!apiKeyConfigured) {
         // Instantly run local simulation without confirm prompts
         try {
           const mockLeads = generateLocalMockLeads(product, region, industry);
+          await applyDistanceSortingIfEnabled(mockLeads, region);
           renderFinderResultsMain(mockLeads);
         } catch (simErr) {
           console.error("Simulation generation or render failed:", simErr);
@@ -1721,7 +1916,7 @@ function init() {
         return;
       }
       if (!product || !region) {
-        alert("Bitte fülle mindestens 'Produkt / Lösung' und 'Region / Stadt' aus.");
+        alert("Bitte fülle mindestens 'Produkt / Lösung' (oder ein Angebot oben) und 'Region / Stadt' aus.");
         return;
       }
 
@@ -1739,10 +1934,12 @@ function init() {
         rawText = rawText.replace(/```json/g, "").replace(/```/g, "").trim();
 
         const parsedLeads = JSON.parse(rawText);
+        await applyDistanceSortingIfEnabled(parsedLeads, region);
         renderFinderResultsMain(parsedLeads);
       } catch (err) {
         console.error("Lead Finder main failed:", err);
         const mockLeads = generateLocalMockLeads(product, region, industry);
+        await applyDistanceSortingIfEnabled(mockLeads, region);
         renderFinderResultsMain(mockLeads);
         alert(`Hinweis: Da die Live-Recherche fehlgeschlagen ist, wurden simulierte B2B-Abnehmer geladen:\n\n${err.message || err}`);
       } finally {
@@ -1771,15 +1968,20 @@ function init() {
         return `
           <div style="background: rgba(255,255,255,0.01); border: 1px solid var(--border-color); border-radius: 6px; padding: 1rem; display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem;">
             <div style="flex: 1; text-align: left;">
-              <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.35rem;">
+              <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.35rem; flex-wrap: wrap;">
                 <h6 style="font-size: 0.9rem; color: var(--accent-cyan); font-weight: 600; margin: 0;">${escapeHtml(lead.company)}</h6>
                 <span style="display: inline-block; padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.65rem; font-weight: 600; ${potenzialBadgeStyle(potenzial)}">Potenzial: ${escapeHtml(potenzial)}</span>
+                ${
+                  typeof lead.distanceKm === "number"
+                    ? `<span style="display: inline-flex; align-items: center; gap: 0.2rem; padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.65rem; font-weight: 600; background: rgba(255,255,255,0.06); color: var(--text-muted);"><i data-lucide="map-pin" style="width: 10px; height: 10px;"></i> ${lead.distanceKm < 10 ? lead.distanceKm.toFixed(1) : Math.round(lead.distanceKm)} km entfernt</span>`
+                    : ""
+                }
               </div>
               <p style="font-size: 0.8rem; color: var(--text-main); margin-bottom: 0.35rem; margin-top: 0;">
                 <strong>Kontakt:</strong> ${escapeHtml(lead.contact) || "-"} | <strong>E-Mail:</strong> ${escapeHtml(lead.email) || "-"} | <strong>Tel:</strong> ${escapeHtml(lead.phone) || "-"}
               </p>
               <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.35rem; margin-top: 0;">
-                <strong>Website:</strong> ${renderSafeLink(lead.website)}
+                <strong>Website:</strong> ${renderSafeLink(lead.website)} ${lead.location ? `| <strong>Ort:</strong> ${escapeHtml(lead.location)}` : ""}
               </p>
               <p style="font-size: 0.8rem; color: var(--text-muted); line-height: 1.4; margin: 0;">
                 <strong>Hintergrund:</strong> ${escapeHtml(lead.notes) || "-"}

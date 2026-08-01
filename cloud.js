@@ -66,19 +66,21 @@ export function syncSettingsToCloud() {
   );
 }
 
-/** Pulls all three docs from the cloud and writes them into localStorage,
- * so the rest of app.js (which only ever reads localStorage) picks up the
- * synced state transparently. Call this once, right after login, before
- * running the app's normal init(). */
+/** Pulls all docs from the cloud and writes them into localStorage, so the
+ * rest of app.js (which only ever reads localStorage) picks up the synced
+ * state transparently. Call this once, right after login, before running
+ * the app's normal init(). */
 export async function hydrateFromCloud() {
-  const [campaigns, clients, settings] = await Promise.all([
+  const [campaigns, clients, settings, offers] = await Promise.all([
     getDoc("campaigns", {}),
     getDoc("clients", []),
     getDoc("settings", {}),
+    getDoc("offers", []),
   ]);
 
   localStorage.setItem("sales_campaigns", JSON.stringify(campaigns || {}));
   localStorage.setItem("sales_clients", JSON.stringify(clients || []));
+  localStorage.setItem("sales_offers", JSON.stringify(offers || []));
 
   if (settings) {
     if (settings.app_name) localStorage.setItem("sales_app_name", settings.app_name);
