@@ -306,10 +306,15 @@ function init() {
         const option = document.createElement("option");
         option.value = m.name;
 
+        // Deliberately no longer hardcode a specific model name as
+        // "(Empfohlen)" here: Google has already retired one previously-
+        // recommended model (gemini-2.5-flash) out from under existing API
+        // keys without notice, which silently broke every AI feature for
+        // accounts that got auto-defaulted to it. Just show Google's own
+        // displayName plus a generic size/speed hint - no name-specific
+        // favoritism that can go stale.
         let displayName = m.displayName || m.name;
-        if (m.name === "gemini-2.5-flash") {
-          displayName = "Gemini 3.6 Flash (Empfohlen)";
-        } else if (m.name.includes("lite")) displayName += " (Lite - Schnell/Kostenlos)";
+        if (m.name.includes("lite")) displayName += " (Lite - Schnell/Kostenlos)";
         else if (m.name.includes("pro")) displayName += " (Pro - Tiefe Analyse)";
         else if (m.name.includes("flash")) displayName += " (Flash)";
 
@@ -318,17 +323,12 @@ function init() {
         modelSelect.appendChild(option);
       });
 
-      const preferredModels = ["gemini-2.5-flash", "gemini-1.5-flash", "gemini-1.5-pro"];
-      let defaultSelected = false;
-      for (const pref of preferredModels) {
-        const opt = Array.from(modelSelect.options).find(o => o.value === pref);
-        if (opt) {
-          opt.selected = true;
-          defaultSelected = true;
-          break;
-        }
-      }
-      if (!defaultSelected && modelSelect.options.length > 0) {
+      // Default to whatever Google's API returned first for this key - that
+      // ordering reflects which models Google currently considers current/
+      // available for THIS account, which is far more reliable than a
+      // hardcoded preference list that inevitably goes stale as Google
+      // retires and renames models over time.
+      if (modelSelect.options.length > 0) {
         modelSelect.options[0].selected = true;
       }
       const selectedOpt = modelSelect.options[modelSelect.selectedIndex];
