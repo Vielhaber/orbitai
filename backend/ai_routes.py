@@ -5,6 +5,7 @@ Supabase's own auto-generated REST API, protected by the RLS policies in
 db/schema.sql - it doesn't need to pass through this backend at all.
 """
 
+import asyncio
 import json
 import urllib.error
 import urllib.parse
@@ -15,6 +16,19 @@ from pydantic import BaseModel
 
 import db, gemini, ssrf, usage
 from auth import AuthContext, get_auth_context
+
+# Every route below that talks to Gemini, Nominatim, or a scraped website
+# uses the stdlib `urllib`, which is BLOCKING. Calling it directly inside an
+# `async def` route handler freezes the entire event loop for as long as
+# the network call takes - on a single-worker Uvicorn process (as used
+# here) that means EVERY other request (including unrelated tenants' auth
+# checks and health checks) stalls too. This went unnoticed for quick
+# calls, but surfaced hard on the "match 50-100 leads" prompt: a single
+# slow Gemini generation (over a minute once heavy JSON output is
+# involved) blocked the whole server, and the platform's own health/idle
+# handling could not get through - requests looked like they hung forever
+# with no response at all, not even an error. `asyncio.to_thread` runs the
+# blocking call in a worker thread instead, keeping the event loop free.
 
 router = APIRouter(prefix="/api")
 
@@ -78,7 +92,7 @@ async def list_models(ctx: AuthContext = Depends(get_auth_context)):
     if not api_key:
         raise HTTPException(status_code=400, detail="Kein API-Key hinterlegt.")
     try:
-        models = gemini.call_list_models(api_key)
+        models = await asyncio.to_thread(gemini.call_list_models, api_key)
         return {"models": models}
     except Exception as e:
         print(f"[models] failed for tenant {ctx.tenant_id}: {e}")
@@ -106,7 +120,7 @@ async def generate(body: GenerateBody, ctx: AuthContext = Depends(get_auth_conte
     usage.check_and_log_usage(ctx.tenant_id, "generate")
 
     try:
-        text = gemini.call_generate(api_key, prompt, body.model or "")
+        text = await asyncio.to_thread(gemini.call_generate, api_key, prompt, body.model or "")
         return {"text": text}
     except urllib.error.HTTPError as e:
         try:
@@ -142,7 +156,7 @@ async def generate_image(body: GenerateImageBody, ctx: AuthContext = Depends(get
     usage.check_and_log_usage(ctx.tenant_id, "generate-image")
 
     try:
-        image_b64 = gemini.call_generate_image(api_key, prompt)
+        image_b64 = await asyncio.to_thread(gemini.call_generate_image, api_key, prompt)
         return {"imageBase64": image_b64}
     except urllib.error.HTTPError as e:
         try:
@@ -181,7 +195,7 @@ async def geocode(place: str = Query(...), ctx: AuthContext = Depends(get_auth_c
     if cached:
         return {"lat": cached[0], "lon": cached[1]}
 
-    try:
+    def _fetch_nominatim():
         url = "https://nominatim.openstreetmap.org/search?" + urllib.parse.urlencode(
             {"format": "json", "limit": "1", "q": place.strip()}
         )
@@ -194,7 +208,10 @@ async def geocode(place: str = Query(...), ctx: AuthContext = Depends(get_auth_c
             },
         )
         with urllib.request.urlopen(req, timeout=8) as resp:
-            results = json.loads(resp.read().decode("utf-8"))
+            return json.loads(resp.read().decode("utf-8"))
+
+    try:
+        results = await asyncio.to_thread(_fetch_nominatim)
     except Exception as e:
         print(f"[geocode] lookup failed for '{place}': {e}")
         return {"lat": None, "lon": None}
@@ -236,9 +253,7 @@ async def scrape(url: str = Query(...), ctx: AuthContext = Depends(get_auth_cont
         def get_data(self):
             return "".join(self.text)
 
-    try:
-        import urllib.request
-
+    def _fetch_html():
         req = urllib.request.Request(
             url,
             headers={
@@ -250,7 +265,10 @@ async def scrape(url: str = Query(...), ctx: AuthContext = Depends(get_auth_cont
         )
         opener = ssrf.make_pinned_opener(pinned_ip)
         with opener.open(req, timeout=10) as response:
-            html_content = response.read(2_000_000).decode("utf-8", errors="ignore")
+            return response.read(2_000_000).decode("utf-8", errors="ignore")
+
+    try:
+        html_content = await asyncio.to_thread(_fetch_html)
 
         html_content = re.sub(r"<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>", "", html_content)
         html_content = re.sub(r"<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>", "", html_content)
