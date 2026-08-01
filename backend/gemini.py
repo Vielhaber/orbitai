@@ -27,11 +27,24 @@ def call_generate(api_key: str, prompt: str, model_name: str) -> str:
     def do_call(name: str):
         version = api_version_for(name)
         url = f"https://generativelanguage.googleapis.com/{version}/models/{name}:generateContent?key={api_key}"
-        body = json.dumps({"contents": [{"parts": [{"text": prompt}]}]}).encode("utf-8")
+        payload = {"contents": [{"parts": [{"text": prompt}]}]}
+        if version == "v1beta":
+            # Newer "thinking" models (2.5+) spend a chunk of their latency
+            # budget generating an internal reasoning trace before the real
+            # answer, even though we discard it (see _extract_answer_text).
+            # For long structured-output prompts (e.g. the 50-100 lead
+            # B2B-matching search) that overhead pushed real requests past a
+            # minute and into timeouts. Turning thinking off is a plain
+            # speed/cost win for this app - none of its prompts rely on
+            # visible chain-of-thought. Older models ignore unknown
+            # generationConfig fields, but we only send this on v1beta
+            # (2.5/2.0/3.1-tagged) models to be safe.
+            payload["generationConfig"] = {"thinkingConfig": {"thinkingBudget": 0}}
+        body = json.dumps(payload).encode("utf-8")
         req = urllib.request.Request(
             url, data=body, headers={"Content-Type": "application/json"}, method="POST"
         )
-        with urllib.request.urlopen(req, timeout=60) as resp:
+        with urllib.request.urlopen(req, timeout=110) as resp:
             return json.loads(resp.read().decode("utf-8"))
 
     tried = set()
@@ -44,7 +57,7 @@ def call_generate(api_key: str, prompt: str, model_name: str) -> str:
         try:
             data = do_call(attempt_model)
             break
-        except urllib.error.HTTPError as e:
+        except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError) as e:
             last_error = e
 
     if data is None:
@@ -68,7 +81,7 @@ def call_generate(api_key: str, prompt: str, model_name: str) -> str:
             try:
                 data = do_call(name)
                 break
-            except urllib.error.HTTPError as e:
+            except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError) as e:
                 last_error = e
         if data is None:
             raise last_error
