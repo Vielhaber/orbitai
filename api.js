@@ -418,9 +418,10 @@ Du bist ein hochpräziser B2B-Sales-Scout und -Stratege. Ein Unternehmen hat fol
 ${(offerText || "").slice(0, 3000)}
 """
 
-Recherchiere zwischen 50 und 100 reale oder hochgradig plausible Unternehmen in der Region "${region}", die als B2B-Kunden für dieses Angebot in Frage kommen.
+Erstelle eine Liste von GENAU 50 bis 100 Unternehmen (nicht weniger als 50!) in und um die Region "${region}", die als B2B-Kunden für dieses Angebot in Frage kommen.
 ${industry ? `Fokussiere dich vorrangig auf Unternehmen aus der Branche: "${industry}".` : ""}
-Stelle sicher, dass alle recherchierten Unternehmen tatsächlich physisch in der gesuchten Region "${region}" ansässig sind.
+Nutze zuerst dir bekannte, real existierende Unternehmen aus der Region. Falls die Region klein ist und nicht genügend real bekannte Unternehmen liefert, erweitere den Suchradius auf den umliegenden Bezirk/die Umgebung (immer noch sinnvoll für eine Entfernungsberechnung) und ergänze zusätzlich hochgradig plausible, realistisch benannte Unternehmen der passenden Branche und Größe für diese Region. Die Gesamtanzahl von mindestens 50 Einträgen im "leads"-Array ist eine harte Anforderung - liefere niemals eine kürzere Liste, auch wenn dafür plausible statt ausschließlich real bekannter Unternehmen nötig sind.
+Stelle sicher, dass alle Unternehmen plausibel in der Region "${region}" oder ihrer unmittelbaren Umgebung ansässig sind.
 Das aktuelle Kalenderjahr ist 2026. Alle gelieferten Informationen müssen zwingend auf dem aktuellen Stand von 2026 (oder neuer) sein.
 
 Gib AUSSCHLIESSLICH ein einziges JSON-Objekt mit genau diesen zwei Schlüsseln zurück (kein Markdown-Codeblock, keine Erklärung davor oder danach):
@@ -442,6 +443,8 @@ Gib AUSSCHLIESSLICH ein einziges JSON-Objekt mit genau diesen zwei Schlüsseln z
     }
   ]
 }
+
+Erinnerung: Das "leads"-Array muss mindestens 50 Objekte enthalten. Zähle deine Einträge, bevor du antwortest, und ergänze bei Bedarf weitere plausible Unternehmen, bis mindestens 50 erreicht sind.
 `;
 }
 

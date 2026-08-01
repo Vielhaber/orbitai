@@ -1837,6 +1837,11 @@ function init() {
     }
 
     if (finderLoadingMain) finderLoadingMain.style.display = "flex";
+    const finderLoadingMainText = document.getElementById("finder-loading-main-text");
+    if (finderLoadingMainText) {
+      finderLoadingMainText.textContent =
+        "Erstelle 50-100 passende Leads inkl. Analyse - das kann je nach Region bis zu einigen Minuten dauern...";
+    }
     if (btnRunFinderMain) btnRunFinderMain.disabled = true;
     if (finderResultsMain) finderResultsMain.style.display = "none";
 
@@ -2004,6 +2009,11 @@ function init() {
 
       // Show loading indicator
       if (finderLoadingMain) finderLoadingMain.style.display = "flex";
+      const finderLoadingMainText2 = document.getElementById("finder-loading-main-text");
+      if (finderLoadingMainText2) {
+        finderLoadingMainText2.textContent =
+          "Erstelle 50-100 passende Leads inkl. Analyse - das kann je nach Region bis zu einigen Minuten dauern...";
+      }
       btnRunFinderMain.disabled = true;
       if (finderResultsMain) finderResultsMain.style.display = "none";
 
