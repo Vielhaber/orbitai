@@ -5,7 +5,10 @@ Supabase's own auto-generated REST API, protected by the RLS policies in
 db/schema.sql - it doesn't need to pass through this backend at all.
 """
 
+import json
 import urllib.error
+import urllib.parse
+import urllib.request
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
@@ -14,6 +17,14 @@ import db, gemini, ssrf, usage
 from auth import AuthContext, get_auth_context
 
 router = APIRouter(prefix="/api")
+
+# In-memory geocode cache: {normalized place name: (lat, lon, cached_at)}.
+# Deliberately process-local (no DB table) - resets on redeploy, which is
+# fine since it just means the next lookup re-fetches from Nominatim. Keeps
+# repeated searches for the same city (very common - most leads in one
+# search share a region) from hammering Nominatim's free, rate-limited API.
+_GEOCODE_CACHE: dict[str, tuple[float, float]] = {}
+_GEOCODE_CACHE_MAX = 2000
 
 
 def _get_tenant_key(tenant_id: str) -> str | None:
@@ -148,6 +159,59 @@ async def generate_image(body: GenerateImageBody, ctx: AuthContext = Depends(get
             status_code=502,
             detail=f"Bildgenerierung fehlgeschlagen ({e}). Hinweis: Bild-Generierung ist nicht für jeden Gemini API-Key freigeschaltet.",
         )
+
+
+@router.get("/geocode")
+async def geocode(place: str = Query(...), ctx: AuthContext = Depends(get_auth_context)):
+    """Resolves a free-text place name (city, region) to approximate
+    lat/lon, so the frontend can sort Lead-Scout results by distance from
+    the user's browser location. Uses OpenStreetMap's free Nominatim API -
+    no API key, but rate-limited and usage-policy-restricted, so this is
+    fine at moderate scale; if usage grows a lot, switch to a paid
+    geocoding API (Google/Mapbox) or a self-hosted Nominatim instance.
+
+    Returns {"lat": None, "lon": None} (never an error) when the place
+    can't be resolved, so a bad/unknown location just quietly opts that one
+    lead out of distance sorting instead of breaking the whole search."""
+    normalized = place.strip().lower()
+    if not normalized:
+        return {"lat": None, "lon": None}
+
+    cached = _GEOCODE_CACHE.get(normalized)
+    if cached:
+        return {"lat": cached[0], "lon": cached[1]}
+
+    try:
+        url = "https://nominatim.openstreetmap.org/search?" + urllib.parse.urlencode(
+            {"format": "json", "limit": "1", "q": place.strip()}
+        )
+        req = urllib.request.Request(
+            url,
+            headers={
+                # Nominatim's usage policy requires a real identifying
+                # User-Agent (no default urllib UA, no browser spoofing).
+                "User-Agent": "OrbitAI-Sales-Cockpit/1.0 (contact: ergl.vielhaber@gmail.com)"
+            },
+        )
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            results = json.loads(resp.read().decode("utf-8"))
+    except Exception as e:
+        print(f"[geocode] lookup failed for '{place}': {e}")
+        return {"lat": None, "lon": None}
+
+    if not results:
+        return {"lat": None, "lon": None}
+
+    try:
+        lat = float(results[0]["lat"])
+        lon = float(results[0]["lon"])
+    except (KeyError, ValueError, TypeError):
+        return {"lat": None, "lon": None}
+
+    if len(_GEOCODE_CACHE) >= _GEOCODE_CACHE_MAX:
+        _GEOCODE_CACHE.clear()
+    _GEOCODE_CACHE[normalized] = (lat, lon)
+    return {"lat": lat, "lon": lon}
 
 
 @router.get("/scrape")
