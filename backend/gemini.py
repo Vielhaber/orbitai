@@ -73,15 +73,27 @@ def call_generate(api_key: str, prompt: str, model_name: str) -> str:
         if data is None:
             raise last_error
 
-    text = (
-        data.get("candidates", [{}])[0]
-        .get("content", {})
-        .get("parts", [{}])[0]
-        .get("text")
-    )
+    text = _extract_answer_text(data)
     if not text:
         raise ValueError("Ungueltige Antwort von der Gemini API erhalten.")
     return text
+
+
+def _extract_answer_text(data: dict) -> str:
+    """Pulls the actual answer text out of a generateContent response.
+
+    Newer "thinking" models (e.g. Gemini 2.5+) return MULTIPLE parts in
+    candidates[0].content.parts: one or more reasoning/scratchpad parts
+    marked "thought": true, followed by the real answer part(s). Grabbing
+    parts[0] unconditionally (the old behaviour) picks up the thinking
+    preamble instead of the answer whenever thinking is enabled, which
+    surfaced as prompts coming back as a bulleted restatement of their own
+    instructions instead of an actual result. Skip any part flagged as a
+    thought and join whatever text remains.
+    """
+    parts = data.get("candidates", [{}])[0].get("content", {}).get("parts", [])
+    segments = [p.get("text") for p in parts if p.get("text") and not p.get("thought")]
+    return "\n".join(segments).strip()
 
 
 def call_generate_image(api_key: str, prompt: str) -> str:
