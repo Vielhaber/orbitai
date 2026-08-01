@@ -34,16 +34,44 @@ def call_generate(api_key: str, prompt: str, model_name: str) -> str:
         with urllib.request.urlopen(req, timeout=60) as resp:
             return json.loads(resp.read().decode("utf-8"))
 
-    try:
-        data = do_call(model_name)
-    except urllib.error.HTTPError as e:
-        if model_name != config.FALLBACK_MODEL:
+    tried = set()
+    data = None
+    last_error = None
+    for attempt_model in (model_name, config.FALLBACK_MODEL):
+        if attempt_model in tried:
+            continue
+        tried.add(attempt_model)
+        try:
+            data = do_call(attempt_model)
+            break
+        except urllib.error.HTTPError as e:
+            last_error = e
+
+    if data is None:
+        # Both the requested model and our hardcoded FALLBACK_MODEL failed -
+        # most likely because Google retired one of these model IDs again
+        # (this has already happened once: gemini-2.5-flash, previously the
+        # "recommended" default, became unavailable to new API keys without
+        # any action on our part). Rather than keep hand-guessing model
+        # names as Google's lineup churns, ask this tenant's own key what it
+        # actually has access to right now and retry once with whatever
+        # comes back first.
+        try:
+            available = call_list_models(api_key)
+        except Exception:
+            available = []
+        for m in available:
+            name = m.get("name")
+            if not name or name in tried:
+                continue
+            tried.add(name)
             try:
-                data = do_call(config.FALLBACK_MODEL)
-            except urllib.error.HTTPError:
-                raise e
-        else:
-            raise
+                data = do_call(name)
+                break
+            except urllib.error.HTTPError as e:
+                last_error = e
+        if data is None:
+            raise last_error
 
     text = (
         data.get("candidates", [{}])[0]
