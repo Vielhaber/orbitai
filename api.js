@@ -379,7 +379,7 @@ Schreibe auf Deutsch. Keine einleitenden Floskeln, sondern direkt zum Inhalt.`;
  * (the small sidebar scout asks for 5-7, the main-page scout asks for 50+).
  */
 export function buildLeadFinderPrompt(product, region, industry, minCount) {
-  const countText = minCount >= 50 ? "mindestens 50" : "5 bis 7";
+  const countText = minCount >= 50 ? "zwischen 50 und 100" : "5 bis 7";
   return `
 Du bist ein hochpräziser B2B-Sales-Scout. Recherchiere ${countText} reale oder hochgradig plausible Unternehmen in der Region "${region}", die als B2B-Kunden für folgendes Produkt in Frage kommen: "${product}".
 ${industry ? `Fokussiere dich vorrangig auf Unternehmen aus der Branche: "${industry}".` : ""}
@@ -398,6 +398,50 @@ Erstelle ein JSON-Array, das ausschließlich passende Firmenobjekte enthält. Je
 - "notes": Eine aussagekräftige Vertriebsnotiz, warum dieses Unternehmen das Produkt benötigt
 
 Gib AUSSCHLIESSLICH das nackte JSON-Array zurück. Schreibe keine Erklärungen davor oder danach. Verwende keine Markdown-Codeblocks (\`\`\`json).
+`;
+}
+
+/**
+ * Builds the combined "read our own offer -> find matching customers"
+ * prompt used right after a website has been read/summarized into an
+ * offer. Unlike buildLeadFinderPrompt (a bare JSON array, used by several
+ * existing call sites), this asks for a JSON OBJECT with both a short
+ * market analysis and the lead list, so the two are generated together and
+ * stay consistent with each other. Kept as a separate function specifically
+ * so the existing plain-array callers (sidebar mini-scout, chat assistant
+ * "scout" command, main Lead-Scout button) don't need to change at all.
+ */
+export function buildOfferMatchPrompt(offerText, region, industry) {
+  return `
+Du bist ein hochpräziser B2B-Sales-Scout und -Stratege. Ein Unternehmen hat folgendes Angebot:
+"""
+${(offerText || "").slice(0, 3000)}
+"""
+
+Recherchiere zwischen 50 und 100 reale oder hochgradig plausible Unternehmen in der Region "${region}", die als B2B-Kunden für dieses Angebot in Frage kommen.
+${industry ? `Fokussiere dich vorrangig auf Unternehmen aus der Branche: "${industry}".` : ""}
+Stelle sicher, dass alle recherchierten Unternehmen tatsächlich physisch in der gesuchten Region "${region}" ansässig sind.
+Das aktuelle Kalenderjahr ist 2026. Alle gelieferten Informationen müssen zwingend auf dem aktuellen Stand von 2026 (oder neuer) sein.
+
+Gib AUSSCHLIESSLICH ein einziges JSON-Objekt mit genau diesen zwei Schlüsseln zurück (kein Markdown-Codeblock, keine Erklärung davor oder danach):
+
+{
+  "analyse": "3-6 Sätze Fließtext: Wie gut passt das Angebot in diese Region/Branche? Welche Muster gibt es unter den gefundenen Kunden? Wo liegt die größte Chance, worauf sollte der Vertrieb zuerst achten?",
+  "leads": [
+    {
+      "company": "Vollständiger Firmenname",
+      "contact": "Ein passender Ansprechpartner (z. B. Herr Schmidt (Einkaufsleiter))",
+      "email": "Eine B2B-Kontakt-E-Mail (z. B. info@firma.de)",
+      "phone": "Eine plausible Telefonnummer mit der korrekten regionalen Vorwahl für die Region \\"${region}\\"",
+      "potenzial": "Hoch | Mittel | Gering - geschätztes Kaufpotenzial",
+      "industry": "Die genaue Branche des Unternehmens",
+      "website": "Die Website (z. B. https://www.firma.de)",
+      "location": "Der Ort/die Stadt, in der dieses Unternehmen tatsächlich ansässig ist, so genau wie möglich - wird für eine Entfernungsberechnung genutzt",
+      "passendes_angebot": "Welcher Teil/welches Produkt aus dem oben stehenden Angebot passt am besten zu GENAU diesem Kunden, und warum",
+      "notes": "Eine aussagekräftige Vertriebsnotiz, warum dieses Unternehmen das Angebot braucht"
+    }
+  ]
+}
 `;
 }
 

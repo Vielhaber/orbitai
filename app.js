@@ -31,6 +31,7 @@ import {
   buildStrategistPrompt,
   buildLeadFinderPrompt,
   buildOfferExtractionPrompt,
+  buildOfferMatchPrompt,
   buildChatPrompt,
   buildLandingPagePrompt,
   buildReklamationPrompt,
@@ -146,6 +147,8 @@ function init() {
   const finderOfferExtractLoading = document.getElementById("finder-offer-extract-loading");
   const finderOfferText = document.getElementById("finder-offer-text");
   const btnSaveOffer = document.getElementById("btn-save-offer");
+  const finderOfferHint = document.getElementById("finder-offer-hint");
+  const finderAnalysisMain = document.getElementById("finder-analysis-main");
 
   // Entfernungs-Sortierung
   const finderSortDistance = document.getElementById("finder-sort-distance");
@@ -1768,6 +1771,7 @@ function init() {
       const urlWithScheme = /^https?:\/\//i.test(website) ? website : `https://${website}`;
 
       if (finderOfferExtractLoading) finderOfferExtractLoading.style.display = "flex";
+      if (finderOfferHint) finderOfferHint.style.display = "none";
       btnExtractOffer.disabled = true;
       try {
         const scrapedText = await apiScrape(urlWithScheme);
@@ -1779,6 +1783,18 @@ function init() {
         const offerPrompt = buildOfferExtractionPrompt(scrapedText, urlWithScheme);
         const summary = await apiGenerate(offerPrompt, selectedModel);
         if (finderOfferText) finderOfferText.value = summary.trim();
+
+        // "Anhand der Auslese der Website sollte gleich eine Liste erstellt
+        // werden": once we have the offer, immediately continue into the
+        // full customer-match search - no second click needed - as long as
+        // a search region is already filled in (can't meaningfully search
+        // "everywhere"). If it's empty, just point the user at that field
+        // instead of guessing a region or throwing a blocking alert.
+        if (finderRegionMain && finderRegionMain.value.trim()) {
+          await runOfferMatchSearch(finderOfferText.value.trim());
+        } else if (finderOfferHint) {
+          finderOfferHint.style.display = "block";
+        }
       } catch (err) {
         console.error("Angebot auslesen fehlgeschlagen:", err);
         alert("Angebot konnte nicht automatisch ausgelesen werden: " + (err.message || err) + "\n\nDu kannst es stattdessen manuell in das Textfeld eintragen.");
@@ -1787,6 +1803,71 @@ function init() {
         btnExtractOffer.disabled = false;
       }
     });
+  }
+
+  /** Runs the combined "match customers to this offer" search: 50-100
+   * leads plus a short market analysis, generated together in one call so
+   * they stay consistent, then sorted nearest-first from the user's
+   * browser location (same distance logic as the manual Lead-Scout run).
+   * Triggered automatically right after a successful "Angebot auslesen",
+   * but written as its own function so it degrades gracefully (falls back
+   * to local mock leads, no analysis text) if no API key is configured. */
+  async function runOfferMatchSearch(offerText) {
+    const region = finderRegionMain.value.trim();
+    const industry = finderIndustryMain.value.trim();
+    if (!offerText || !region) return;
+
+    if (finderDistanceStatus) finderDistanceStatus.textContent = "";
+    if (finderAnalysisMain) finderAnalysisMain.style.display = "none";
+    // This flow exists specifically to sort customers by distance from the
+    // user, so switch that on for this run - the user can still uncheck it
+    // afterwards for a plain manual re-run.
+    if (finderSortDistance) finderSortDistance.checked = true;
+
+    if (!apiKeyConfigured) {
+      try {
+        const mockLeads = generateLocalMockLeads(offerText, region, industry);
+        await applyDistanceSortingIfEnabled(mockLeads, region);
+        renderFinderResultsMain(mockLeads);
+      } catch (simErr) {
+        console.error("Simulation generation or render failed:", simErr);
+        alert("Fehler bei der Lead-Simulation: " + simErr.message);
+      }
+      return;
+    }
+
+    if (finderLoadingMain) finderLoadingMain.style.display = "flex";
+    if (btnRunFinderMain) btnRunFinderMain.disabled = true;
+    if (finderResultsMain) finderResultsMain.style.display = "none";
+
+    try {
+      const selectedModel = modelSelect ? modelSelect.value : "";
+      const matchPrompt = buildOfferMatchPrompt(offerText, region, industry);
+      let rawText = await apiGenerate(matchPrompt, selectedModel);
+      rawText = rawText.replace(/```json/g, "").replace(/```/g, "").trim();
+
+      const parsed = JSON.parse(rawText);
+      const leads = Array.isArray(parsed) ? parsed : parsed.leads || [];
+      const analyse = Array.isArray(parsed) ? "" : parsed.analyse || "";
+
+      await applyDistanceSortingIfEnabled(leads, region);
+      renderFinderResultsMain(leads);
+
+      if (analyse && finderAnalysisMain) {
+        finderAnalysisMain.innerHTML =
+          `<strong style="color: var(--accent-cyan);">Analyse:</strong> ${escapeHtml(analyse)}`;
+        finderAnalysisMain.style.display = "block";
+      }
+    } catch (err) {
+      console.error("Angebot-Matching fehlgeschlagen:", err);
+      const mockLeads = generateLocalMockLeads(offerText, region, industry);
+      await applyDistanceSortingIfEnabled(mockLeads, region);
+      renderFinderResultsMain(mockLeads);
+      alert(`Hinweis: Da die Live-Recherche fehlgeschlagen ist, wurden simulierte B2B-Abnehmer geladen:\n\n${err.message || err}`);
+    } finally {
+      if (finderLoadingMain) finderLoadingMain.style.display = "none";
+      if (btnRunFinderMain) btnRunFinderMain.disabled = false;
+    }
   }
 
   if (btnSaveOffer) {
@@ -1902,6 +1983,7 @@ function init() {
       const industry = finderIndustryMain.value.trim();
 
       if (finderDistanceStatus) finderDistanceStatus.textContent = "";
+      if (finderAnalysisMain) finderAnalysisMain.style.display = "none";
 
       if (!apiKeyConfigured) {
         // Instantly run local simulation without confirm prompts
@@ -1983,6 +2065,11 @@ function init() {
               <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.35rem; margin-top: 0;">
                 <strong>Website:</strong> ${renderSafeLink(lead.website)} ${lead.location ? `| <strong>Ort:</strong> ${escapeHtml(lead.location)}` : ""}
               </p>
+              ${
+                lead.passendes_angebot
+                  ? `<p style="font-size: 0.8rem; color: var(--text-muted); line-height: 1.4; margin: 0 0 0.35rem 0;"><strong style="color: var(--accent-cyan);">Passendes Angebot:</strong> ${escapeHtml(lead.passendes_angebot)}</p>`
+                  : ""
+              }
               <p style="font-size: 0.8rem; color: var(--text-muted); line-height: 1.4; margin: 0;">
                 <strong>Hintergrund:</strong> ${escapeHtml(lead.notes) || "-"}
               </p>
