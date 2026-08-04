@@ -12,6 +12,7 @@ Every route that touches tenant-scoped data or the Gemini key MUST depend on
 knowing which tenant it's acting on behalf of.
 """
 
+import asyncio
 import logging
 from dataclasses import dataclass
 
@@ -63,14 +64,21 @@ async def get_auth_context(authorization: str | None = Header(default=None)) -> 
     if not user_id:
         raise HTTPException(status_code=401, detail="Ungültiges oder abgelaufenes Zugriffstoken.")
 
-    membership = (
-        db.service_client()
-        .table("tenant_members")
-        .select("tenant_id")
-        .eq("user_id", user_id)
-        .limit(1)
-        .execute()
-    )
+    def _lookup_membership():
+        return (
+            db.service_client()
+            .table("tenant_members")
+            .select("tenant_id")
+            .eq("user_id", user_id)
+            .limit(1)
+            .execute()
+        )
+
+    # This runs on EVERY authenticated request (it's the shared auth
+    # dependency), so keeping it off the event loop matters even though
+    # each individual call is normally fast - see the note in ai_routes.py
+    # about synchronous Supabase/urllib calls blocking the whole server.
+    membership = await asyncio.to_thread(_lookup_membership)
     rows = membership.data or []
     if not rows:
         # Should not normally happen - the signup trigger creates a tenant

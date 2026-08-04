@@ -59,11 +59,18 @@ def _get_tenant_key(tenant_id: str) -> str | None:
 
 @router.get("/config/status")
 async def config_status(ctx: AuthContext = Depends(get_auth_context)):
-    return {"configured": _get_tenant_key(ctx.tenant_id) is not None}
+    api_key = await asyncio.to_thread(_get_tenant_key, ctx.tenant_id)
+    return {"configured": api_key is not None}
 
 
 class SaveConfigBody(BaseModel):
     apiKey: str
+
+
+def _upsert_tenant_key(tenant_id: str, api_key: str) -> None:
+    db.service_client().table("tenant_secrets").upsert(
+        {"tenant_id": tenant_id, "gemini_api_key": api_key}
+    ).execute()
 
 
 @router.post("/config")
@@ -72,23 +79,25 @@ async def save_config(body: SaveConfigBody, ctx: AuthContext = Depends(get_auth_
     if not api_key:
         raise HTTPException(status_code=400, detail="Kein API-Key übergeben.")
 
-    db.service_client().table("tenant_secrets").upsert(
-        {"tenant_id": ctx.tenant_id, "gemini_api_key": api_key}
-    ).execute()
+    await asyncio.to_thread(_upsert_tenant_key, ctx.tenant_id, api_key)
     return {"ok": True}
+
+
+def _clear_tenant_key(tenant_id: str) -> None:
+    db.service_client().table("tenant_secrets").update({"gemini_api_key": ""}).eq(
+        "tenant_id", tenant_id
+    ).execute()
 
 
 @router.post("/config/clear")
 async def clear_config(ctx: AuthContext = Depends(get_auth_context)):
-    db.service_client().table("tenant_secrets").update({"gemini_api_key": ""}).eq(
-        "tenant_id", ctx.tenant_id
-    ).execute()
+    await asyncio.to_thread(_clear_tenant_key, ctx.tenant_id)
     return {"ok": True}
 
 
 @router.get("/models")
 async def list_models(ctx: AuthContext = Depends(get_auth_context)):
-    api_key = _get_tenant_key(ctx.tenant_id)
+    api_key = await asyncio.to_thread(_get_tenant_key, ctx.tenant_id)
     if not api_key:
         raise HTTPException(status_code=400, detail="Kein API-Key hinterlegt.")
     try:
@@ -110,14 +119,14 @@ async def generate(body: GenerateBody, ctx: AuthContext = Depends(get_auth_conte
     if not prompt:
         raise HTTPException(status_code=400, detail="Fehlender Prompt.")
 
-    api_key = _get_tenant_key(ctx.tenant_id)
+    api_key = await asyncio.to_thread(_get_tenant_key, ctx.tenant_id)
     if not api_key:
         raise HTTPException(
             status_code=400,
             detail="Kein Gemini API-Key hinterlegt. Bitte zuerst in den Einstellungen speichern.",
         )
 
-    usage.check_and_log_usage(ctx.tenant_id, "generate")
+    await asyncio.to_thread(usage.check_and_log_usage, ctx.tenant_id, "generate")
 
     try:
         text = await asyncio.to_thread(gemini.call_generate, api_key, prompt, body.model or "")
@@ -146,14 +155,14 @@ async def generate_image(body: GenerateImageBody, ctx: AuthContext = Depends(get
     if not prompt:
         raise HTTPException(status_code=400, detail="Fehlender Prompt.")
 
-    api_key = _get_tenant_key(ctx.tenant_id)
+    api_key = await asyncio.to_thread(_get_tenant_key, ctx.tenant_id)
     if not api_key:
         raise HTTPException(
             status_code=400,
             detail="Kein Gemini API-Key hinterlegt. Bitte zuerst in den Einstellungen speichern.",
         )
 
-    usage.check_and_log_usage(ctx.tenant_id, "generate-image")
+    await asyncio.to_thread(usage.check_and_log_usage, ctx.tenant_id, "generate-image")
 
     try:
         image_b64 = await asyncio.to_thread(gemini.call_generate_image, api_key, prompt)
@@ -237,7 +246,7 @@ async def scrape(url: str = Query(...), ctx: AuthContext = Depends(get_auth_cont
     if not safe:
         raise HTTPException(status_code=400, detail=reason)
 
-    usage.check_and_log_usage(ctx.tenant_id, "scrape")
+    await asyncio.to_thread(usage.check_and_log_usage, ctx.tenant_id, "scrape")
 
     import re
     from html.parser import HTMLParser
