@@ -379,11 +379,18 @@ Schreibe auf Deutsch. Keine einleitenden Floskeln, sondern direkt zum Inhalt.`;
  * (the small sidebar scout asks for 5-7, the main-page scout asks for 50+).
  */
 export function buildLeadFinderPrompt(product, region, industry, minCount) {
-  const countText = minCount >= 50 ? "zwischen 50 und 100" : "5 bis 7";
+  const isLargeSearch = minCount >= 50;
+  const countInstruction = isLargeSearch
+    ? `Erstelle eine Liste von GENAU 50 bis 100 Unternehmen (nicht weniger als 50!) in und um die Region "${region}", die als B2B-Kunden für folgendes Produkt in Frage kommen: "${product}".`
+    : `Recherchiere 5 bis 7 reale oder hochgradig plausible Unternehmen in der Region "${region}", die als B2B-Kunden für folgendes Produkt in Frage kommen: "${product}".`;
   return `
-Du bist ein hochpräziser B2B-Sales-Scout. Recherchiere ${countText} reale oder hochgradig plausible Unternehmen in der Region "${region}", die als B2B-Kunden für folgendes Produkt in Frage kommen: "${product}".
+Du bist ein hochpräziser B2B-Sales-Scout. ${countInstruction}
 ${industry ? `Fokussiere dich vorrangig auf Unternehmen aus der Branche: "${industry}".` : ""}
-Stelle sicher, dass alle recherchierten Unternehmen tatsächlich physisch in der gesuchten Region "${region}" ansässig sind.
+${
+  isLargeSearch
+    ? `Nutze zuerst dir bekannte, real existierende Unternehmen aus der Region. Falls die Region klein ist und nicht genügend real bekannte Unternehmen liefert, erweitere den Suchradius auf den umliegenden Bezirk/die Umgebung (immer noch sinnvoll für eine Entfernungsberechnung) und ergänze zusätzlich hochgradig plausible, realistisch benannte Unternehmen der passenden Branche und Größe für diese Region. Die Gesamtanzahl von mindestens 50 Einträgen ist eine harte Anforderung - liefere niemals eine kürzere Liste, auch wenn dafür plausible statt ausschließlich real bekannter Unternehmen nötig sind.`
+    : `Stelle sicher, dass alle recherchierten Unternehmen tatsächlich physisch in der gesuchten Region "${region}" ansässig sind.`
+}
 Das aktuelle Kalenderjahr ist 2026. Alle gelieferten Informationen müssen zwingend auf dem aktuellen Stand von 2026 (oder neuer) sein.
 
 Erstelle ein JSON-Array, das ausschließlich passende Firmenobjekte enthält. Jedes Objekt muss exakt diese Schlüssel besitzen:
@@ -398,6 +405,7 @@ Erstelle ein JSON-Array, das ausschließlich passende Firmenobjekte enthält. Je
 - "notes": Eine aussagekräftige Vertriebsnotiz, warum dieses Unternehmen das Produkt benötigt
 
 Gib AUSSCHLIESSLICH das nackte JSON-Array zurück. Schreibe keine Erklärungen davor oder danach. Verwende keine Markdown-Codeblocks (\`\`\`json).
+${isLargeSearch ? "\nErinnerung: Das JSON-Array muss mindestens 50 Objekte enthalten. Zähle deine Einträge, bevor du antwortest, und ergänze bei Bedarf weitere plausible Unternehmen, bis mindestens 50 erreicht sind." : ""}
 `;
 }
 

@@ -1757,6 +1757,15 @@ function init() {
     });
   }
 
+  // Once a region is typed, the "fill in a region above" hint no longer
+  // applies - hide it proactively instead of waiting for the next "Angebot
+  // auslesen" click, so it doesn't look like stale/stuck UI.
+  if (finderRegionMain && finderOfferHint) {
+    finderRegionMain.addEventListener("input", () => {
+      if (finderRegionMain.value.trim()) finderOfferHint.style.display = "none";
+    });
+  }
+
   if (btnExtractOffer) {
     btnExtractOffer.addEventListener("click", async () => {
       const website = (finderOfferWebsite.value || "").trim();
@@ -1781,8 +1790,12 @@ function init() {
         }
         const selectedModel = modelSelect ? modelSelect.value : "";
         const offerPrompt = buildOfferExtractionPrompt(scrapedText, urlWithScheme);
-        const summary = await apiGenerate(offerPrompt, selectedModel);
-        if (finderOfferText) finderOfferText.value = summary.trim();
+        const summary = (await apiGenerate(offerPrompt, selectedModel)).trim();
+        if (!summary) {
+          alert("Die KI konnte aus dieser Website keine Angebotszusammenfassung erstellen. Bitte trage das Angebot stattdessen manuell ein.");
+          return;
+        }
+        if (finderOfferText) finderOfferText.value = summary;
 
         // "Anhand der Auslese der Website sollte gleich eine Liste erstellt
         // werden": once we have the offer, immediately continue into the
@@ -1791,7 +1804,7 @@ function init() {
         // "everywhere"). If it's empty, just point the user at that field
         // instead of guessing a region or throwing a blocking alert.
         if (finderRegionMain && finderRegionMain.value.trim()) {
-          await runOfferMatchSearch(finderOfferText.value.trim());
+          await runOfferMatchSearch(summary);
         } else if (finderOfferHint) {
           finderOfferHint.style.display = "block";
         }
@@ -1893,6 +1906,12 @@ function init() {
         offerText,
         savedAt: new Date().toISOString(),
       });
+      // Cap the history so it can't grow unbounded across months of use -
+      // localStorage has a hard size limit and this also gets synced to the
+      // cloud on every save, so keeping only the most recent entries keeps
+      // both fast and small.
+      const OFFER_HISTORY_MAX = 30;
+      if (offers.length > OFFER_HISTORY_MAX) offers.length = OFFER_HISTORY_MAX;
       saveOffers(offers);
       renderOfferHistoryOptions();
     });
